@@ -1,0 +1,19 @@
+{
+  "name": "dashboard-honor-petugas-lokal",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Dashboard Honor & Penugasan Petugas BPS — versi statis dengan penyimpanan lokal dan impor/ekspor Excel",
+  "type": "module",
+  "scripts": {
+    "dev": "serve public -l 3000",
+    "start": "serve public -l 3000",
+    "test": "node tests/smoke-test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "exceljs": "4.4.0",
+    "serve": "14.2.4"
+  }
+}

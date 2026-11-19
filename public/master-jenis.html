@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar Jenis Kegiatan — Honor &amp; Penugasan Petugas</title>
+  <meta name="description" content="Kelola jenis kegiatan untuk kolom rekap.">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="master-jenis">
+  <div class="mobile-overlay" id="mobile-overlay" hidden></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" id="content">
+        <section class="page-section">
+          <div class="toolbar card">
+            <div class="toolbar-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5"></circle>
+                <path d="m16 16 4.5 4.5"></path>
+              </svg>
+              <label class="sr-only" for="cari-jenis">Cari jenis kegiatan</label>
+              <input type="search" id="cari-jenis" placeholder="Cari jenis kegiatan…" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="card table-card">
+            <div class="table-card-head">
+              <div>
+                <h3>Jenis Kegiatan <span class="badge" id="jumlah-jenis">0 jenis</span></h3>
+                <p>Jumlah penugasan mengikuti tahun aktif.</p>
+              </div>
+              <button type="button" class="btn btn-primary" id="btn-tambah-jenis">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                Tambah Jenis
+              </button>
+            </div>
+
+            <div class="table-wrap">
+              <table id="tabel-jenis">
+                <thead>
+                  <tr>
+                    <th>Nama Jenis Kegiatan</th>
+                    <th style="width:190px">Jumlah Penugasan</th>
+                    <th style="width:170px;text-align:right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-jenis"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="display:flex;gap:12px;padding:15px 18px;align-items:flex-start">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;color:#cf8a0a;margin-top:1px" aria-hidden="true">
+              <path d="M12 9v4M12 17h.01"></path>
+              <path d="M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z"></path>
+            </svg>
+            <div>
+              <p style="font-size:12.5px;font-weight:650;color:#33475f">Jenis kegiatan yang sudah dipakai tidak dapat dihapus</p>
+              <p style="font-size:11.5px;color:#687b92;margin-top:1px">Jenis kegiatan yang sudah dipakai pada data penugasan tidak dapat dihapus agar data penugasan tetap utuh. Jenis lain, termasuk “Lainnya”, dapat dihapus.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="modal-jenis" class="modal" aria-labelledby="judul-modal-jenis" style="width:min(520px,calc(100vw - 28px))">
+    <form id="form-jenis" novalidate>
+      <div class="modal-header">
+        <div>
+          <h2 id="judul-modal-jenis">Tambah Jenis Kegiatan</h2>
+          <p>Jenis kegiatan menjadi kolom pada halaman Rekap per Jenis Kegiatan.</p>
+        </div>
+        <button type="button" class="icon-button" id="tutup-modal-jenis" aria-label="Tutup formulir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-alert" id="alert-jenis" role="alert"></div>
+        <div class="form-grid">
+          <div class="field full" data-field="nama">
+            <label for="f-nama-jenis">Nama Jenis Kegiatan <span class="wajib">*</span></label>
+            <input type="text" id="f-nama-jenis" maxlength="100" autocomplete="off" placeholder="Contoh: Pengolahan Data">
+            <p class="field-error" data-error="nama"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="batal-modal-jenis">Batal</button>
+        <button type="submit" class="btn btn-primary" id="simpan-jenis">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="module" src="/js/master-jenis.js"></script>
+</body>
+</html>

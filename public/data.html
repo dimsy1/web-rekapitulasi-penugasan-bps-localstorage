@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data &amp; Excel — Honor &amp; Penugasan Petugas</title>
+  <meta name="description" content="Impor dan ekspor data penugasan petugas dari/ke file Excel.">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="data">
+  <div class="mobile-overlay" id="mobile-overlay" hidden></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" id="content">
+        <section class="page-section">
+          <div class="card data-intro">
+            <div>
+              <span class="eyebrow">Sumber data</span>
+              <h2>Data tersimpan di browser ini</h2>
+              <p>
+                Aplikasi ini berjalan tanpa server. Data disimpan di <strong>localStorage</strong>
+                browser, lalu bisa diimpor dari file Excel dan diekspor kembali ke Excel.
+                Data tidak otomatis tersinkron antar perangkat.
+              </p>
+            </div>
+            <div class="data-stats" id="data-stats">
+              <div class="stat-card">
+                <span class="stat-label">Baris penugasan</span>
+                <strong class="stat-value" id="stat-baris">0</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Petugas</span>
+                <strong class="stat-value" id="stat-petugas">0</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Jenis kegiatan</span>
+                <strong class="stat-value" id="stat-jenis">0</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Total honor</span>
+                <strong class="stat-value" id="stat-honor">Rp 0</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Tahun data</span>
+                <strong class="stat-value" id="stat-tahun">—</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Terakhir diubah</span>
+                <strong class="stat-value stat-value-small" id="stat-diperbarui">—</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-grid">
+            <section class="card data-card">
+              <div class="data-card-head">
+                <div>
+                  <h3>Impor dari Excel</h3>
+                  <p>Membaca sheet <code>Data Penugasan</code> dan <code>Referensi</code>.</p>
+                </div>
+                <span class="badge badge-muted">.xlsx</span>
+              </div>
+
+              <div class="dropzone" id="dropzone" role="button" tabindex="0"
+                   aria-label="Pilih atau seret file Excel ke sini">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 16V4"></path>
+                  <path d="m7 9 5-5 5 5"></path>
+                  <path d="M4 16v3.5h16V16"></path>
+                </svg>
+                <strong>Klik atau seret file Excel ke sini</strong>
+                <span>Format .xlsx — satu baris untuk setiap penugasan</span>
+                <input type="file" id="file-excel" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+              </div>
+
+              <div class="state-box state-box-compact" id="impor-loading" hidden>
+                <div class="spinner" aria-hidden="true"></div>
+                <p>Membaca file Excel…</p>
+              </div>
+
+              <div id="import-preview" hidden>
+                <div class="import-summary" id="import-summary"></div>
+                <div class="import-errors" id="import-errors" hidden>
+                  <h4>Baris yang tidak dapat diimpor</h4>
+                  <div class="error-list" id="error-list"></div>
+                </div>
+                <div class="import-actions">
+                  <button type="button" class="btn btn-secondary" id="batal-impor">Batal</button>
+                  <button type="button" class="btn btn-primary" id="terapkan-impor">Terapkan Impor</button>
+                </div>
+                <p class="import-warning">
+                  Impor akan <strong>menimpa seluruh data</strong> yang ada di browser ini.
+                  Data lama otomatis dibackup dan dapat dipulihkan dari bagian Pemulihan.
+                </p>
+              </div>
+            </section>
+
+            <section class="card data-card">
+              <div class="data-card-head">
+                <div>
+                  <h3>Ekspor ke Excel</h3>
+                  <p>Mengunduh seluruh data aktif sebagai file .xlsx.</p>
+                </div>
+              </div>
+
+              <p class="data-copy">
+                File hasil ekspor berisi sheet <strong>Data Penugasan</strong> (7 kolom) dan
+                <strong>Referensi</strong>. Sheet rekap tidak ditulis karena web selalu
+                menghitung ulang rekap dari data penugasan.
+              </p>
+
+              <button type="button" class="btn btn-primary btn-block" id="btn-ekspor">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v11"></path><path d="m8 10 4 4 4-4"></path><path d="M4 17v2.5h16V17"></path>
+                </svg>
+                Unduh Data Excel
+              </button>
+
+              <h3 class="data-subhead">Cadangan &amp; pemulihan</h3>
+              <p class="data-copy">
+                Cadangan JSON berguna sebelum membersihkan data browser atau berpindah perangkat.
+              </p>
+              <div class="data-actions">
+                <button type="button" class="btn btn-secondary" id="btn-backup">Unduh Backup JSON</button>
+                <button type="button" class="btn btn-secondary" id="btn-pulihkan">Pulihkan Backup</button>
+                <input type="file" id="file-backup" accept=".json,application/json" hidden>
+              </div>
+
+              <div class="data-danger">
+                <div>
+                  <strong>Kosongkan semua data</strong>
+                  <p>Data aktif akan dihapus. Backup otomatis tetap disimpan di browser.</p>
+                </div>
+                <button type="button" class="btn btn-danger" id="btn-reset">Kosongkan</button>
+              </div>
+
+              <p class="data-meta">
+                Penyimpanan terpakai: <span id="status-ukuran">—</span>.
+                Jangan gunakan mode Incognito untuk menyimpan data jangka panjang.
+              </p>
+            </section>
+          </div>
+
+          <p class="data-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5h.01"></path>
+            </svg>
+            <span>
+              Data hanya ada di browser ini. Jika data situs dibersihkan, data akan hilang.
+              Ekspor Excel atau backup JSON secara berkala.
+            </span>
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/vendor/exceljs.min.js"></script>
+  <script type="module" src="/js/data.js"></script>
+</body>
+</html>

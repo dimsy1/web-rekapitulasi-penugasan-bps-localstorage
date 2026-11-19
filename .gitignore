@@ -1,0 +1,38 @@
+# Dependensi
+node_modules/
+
+# Environment (semua varian, kecuali contoh)
+.env
+.env.*
+!.env.example
+
+# Log
+npm-debug.log*
+*.log
+
+# Database dump / backup (JANGAN pernah commit data asli)
+database/dumps/
+dump-*.sql
+*.dump
+*.sql.gz
+*.bak
+*.backup
+
+# OS & editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Build / coverage / export
+dist/
+build/
+coverage/
+exports/
+.vercel/
+
+# File data & ekspor (jangan commit data asli)
+*.xlsx
+*.xls
+backup-dashboard-honor-*.json

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rekap per Bulan — Honor &amp; Penugasan Petugas</title>
+  <meta name="description" content="Rekap honor petugas per bulan beserta total setahun.">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="rekap-bulanan">
+  <div class="mobile-overlay" id="mobile-overlay" hidden></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" id="content">
+        <section class="page-section">
+          <div class="print-header">
+            <h1>Rekap Honor Bulanan Petugas</h1>
+            <p>Badan Pusat Statistik — Tahun <span id="print-tahun">—</span></p>
+          </div>
+
+          <div class="report-head card">
+            <div>
+              <h2>Rekap Honor per Bulan</h2>
+              <p id="ringkasan-rekap">Memuat data tahun aktif…</p>
+            </div>
+            <!-- Fitur cetak dan ekspor CSV dinonaktifkan.
+            <div class="report-actions">
+              <button type="button" class="btn btn-secondary" id="btn-cetak">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M7 9V4h10v5"></path><rect x="4" y="9" width="16" height="8" rx="2"></rect><path d="M7 14h10v6H7z"></path>
+                </svg>
+                Cetak
+              </button>
+              <button type="button" class="btn btn-primary" id="btn-csv">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v11"></path><path d="m8 10 4 4 4-4"></path><path d="M4 17v2.5h16V17"></path>
+                </svg>
+                Ekspor CSV
+              </button>
+            </div>
+            -->
+          </div>
+
+          <div class="state-box" id="rekap-loading">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Memuat data rekap…</p>
+          </div>
+
+          <div class="state-box" id="rekap-empty" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="16" rx="2.5"></rect>
+              <path d="M8 3v4M16 3v4M3 10h18"></path>
+              <path d="M8 15h8"></path>
+            </svg>
+            <h3 id="empty-judul">Belum ada data untuk tahun ini</h3>
+            <p id="empty-pesan">Tambahkan penugasan pada halaman Daftar Penugasan, lalu pilih tahun yang sesuai.</p>
+          </div>
+
+          <div class="card rekap-card" id="rekap-card" hidden>
+            <div class="table-rekap-wrap">
+              <table class="table-rekap" id="tabel-rekap">
+                <colgroup id="colgroup-rekap"></colgroup>
+                <thead id="thead-rekap"></thead>
+                <tbody id="tbody-rekap"></tbody>
+              </table>
+            </div>
+            <div class="table-foot">
+              <span>Satuan honor: Rupiah. Tanda “-” berarti 0.</span>
+              <span id="foot-tahun">Sumber: data penugasan tahun —</span>
+            </div>
+          </div>
+
+          <p class="data-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5h.01"></path>
+            </svg>
+            <span>Rekap dihitung ulang dari data penugasan setiap kali halaman dimuat. Seluruh 12 bulan selalu ditampilkan.</span>
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="module" src="/js/rekap-bulanan.js"></script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar Penugasan — Honor &amp; Penugasan Petugas</title>
+  <meta name="description" content="Kelola data penugasan dan honor petugas.">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="penugasan">
+  <div class="mobile-overlay" id="mobile-overlay" hidden></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" id="content">
+        <section class="page-section">
+          <div class="toolbar card">
+            <div class="toolbar-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5"></circle>
+                <path d="m16 16 4.5 4.5"></path>
+              </svg>
+              <label class="sr-only" for="cari">Cari penugasan</label>
+              <input type="search" id="cari" placeholder="Cari nama petugas atau kegiatan…" autocomplete="off">
+            </div>
+            <div class="toolbar-filters">
+              <label class="sr-only" for="filter-bulan">Filter bulan</label>
+              <select id="filter-bulan" class="control-select">
+                <option value="">Semua bulan</option>
+              </select>
+              <label class="sr-only" for="filter-jenis">Filter jenis kegiatan</label>
+              <select id="filter-jenis" class="control-select">
+                <option value="">Semua jenis</option>
+              </select>
+              <!-- Fitur ekspor CSV dinonaktifkan.
+              <button type="button" class="btn btn-secondary" id="btn-ekspor">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v11"></path><path d="m8 10 4 4 4-4"></path><path d="M4 17v2.5h16V17"></path>
+                </svg>
+                Ekspor CSV
+              </button>
+              -->
+              <button type="button" class="btn btn-primary" id="btn-tambah">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                Tambah Penugasan
+              </button>
+            </div>
+          </div>
+
+          <div class="card table-card">
+            <div class="table-card-head">
+              <div>
+                <h3>Data Penugasan <span class="badge" id="jumlah-data">0 baris</span></h3>
+                <p>Semua perubahan langsung memengaruhi dashboard dan halaman rekap.</p>
+              </div>
+              <span class="badge badge-muted" id="badge-tahun">Tahun —</span>
+            </div>
+            <div class="table-wrap">
+              <table id="tabel-penugasan" class="display" style="width:100%">
+                <thead>
+                  <tr>
+                    <th style="width:56px">No</th>
+                    <th style="width:150px">Nama Petugas</th>
+                    <th style="width:155px">Jenis Kegiatan</th>
+                    <th>Nama Pekerjaan/Kegiatan</th>
+                    <th style="width:105px">Bulan</th>
+                    <th style="width:72px">Tahun</th>
+                    <th class="num" style="width:135px">Honor</th>
+                    <th style="width:96px;text-align:right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="modal-penugasan" class="modal" aria-labelledby="judul-modal-penugasan">
+    <form id="form-penugasan" novalidate>
+      <div class="modal-header">
+        <div>
+          <h2 id="judul-modal-penugasan">Tambah Penugasan</h2>
+          <p>Isi data penugasan dan honor petugas.</p>
+        </div>
+        <button type="button" class="icon-button" id="tutup-modal" aria-label="Tutup formulir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-alert" id="alert-form" role="alert"></div>
+        <div class="form-grid">
+          <div class="field full" data-field="petugas_id">
+            <label for="f-petugas">Nama Petugas <span class="wajib">*</span></label>
+            <div class="combobox" id="cb-petugas">
+              <div class="combobox-input-wrap">
+                <input type="text" id="f-petugas" maxlength="150" placeholder="Ketik nama petugas…" autocomplete="off"
+                       role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="cb-petugas-list">
+                <button type="button" class="combobox-toggle" id="cb-petugas-toggle" aria-label="Buka daftar petugas">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6"></path>
+                  </svg>
+                </button>
+              </div>
+              <ul class="combobox-list" id="cb-petugas-list" role="listbox" hidden></ul>
+              <input type="hidden" id="f-petugas-id">
+            </div>
+            <p class="field-hint">Ketik nama petugas. Pilih dari rekomendasi yang muncul, atau ketik nama baru—nama tersebut disimpan otomatis saat penugasan disimpan.</p>
+            <p class="field-error" data-error="petugas_id"></p>
+          </div>
+
+          <div class="field" data-field="jenis_kegiatan_id">
+            <label for="f-jenis">Jenis Kegiatan <span class="wajib">*</span></label>
+            <select id="f-jenis">
+              <option value="">— Pilih jenis —</option>
+            </select>
+            <p class="field-error" data-error="jenis_kegiatan_id"></p>
+          </div>
+
+          <div class="field" data-field="bulan">
+            <label for="f-bulan">Bulan <span class="wajib">*</span></label>
+            <select id="f-bulan">
+              <option value="">— Pilih bulan —</option>
+            </select>
+            <p class="field-error" data-error="bulan"></p>
+          </div>
+
+          <div class="field full" data-field="nama_pekerjaan">
+            <label for="f-nama-pekerjaan">Nama Pekerjaan/Kegiatan <span class="wajib">*</span></label>
+            <input type="text" id="f-nama-pekerjaan" maxlength="255" list="daftar-pekerjaan"
+                   placeholder="Ketik nama pekerjaan/kegiatan…" autocomplete="off">
+            <datalist id="daftar-pekerjaan"></datalist>
+            <p class="field-hint">Bisa diketik bebas. Saran diambil dari daftar nama kegiatan dan data yang pernah diisi.</p>
+            <p class="field-error" data-error="nama_pekerjaan"></p>
+          </div>
+
+          <div class="field" data-field="tahun">
+            <label for="f-tahun">Tahun <span class="wajib">*</span></label>
+            <input type="number" id="f-tahun" min="2020" step="1" inputmode="numeric" placeholder="2026">
+            <p class="field-error" data-error="tahun"></p>
+          </div>
+
+          <div class="field" data-field="honor">
+            <label for="f-honor">Honor <span class="wajib">*</span></label>
+            <div class="input-prefix">
+              <span>Rp</span>
+              <input type="text" id="f-honor" inputmode="numeric" autocomplete="off" placeholder="0">
+            </div>
+            <p class="field-error" data-error="honor"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="batal-modal">Batal</button>
+        <button type="submit" class="btn btn-primary" id="simpan-modal">Simpan Penugasan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="module" src="/js/penugasan.js"></script>
+</body>
+</html>

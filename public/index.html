@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — Honor &amp; Penugasan Petugas</title>
+  <meta name="description" content="Dashboard rekapitulasi honor dan penugasan petugas BPS.">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="dashboard">
+  <div class="mobile-overlay" id="mobile-overlay" hidden></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" id="content">
+        <section class="page-section">
+          <div class="kpi-grid">
+            <article class="kpi-card kpi-honor">
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="6" width="18" height="13" rx="2.5"></rect>
+                  <path d="M3 10h18"></path>
+                  <circle cx="17" cy="14.5" r="1.4"></circle>
+                </svg>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Total honor setahun</p>
+                <p class="kpi-value" id="kpi-honor">—</p>
+                <p class="kpi-meta" id="kpi-honor-meta">Memuat data…</p>
+              </div>
+            </article>
+
+            <article class="kpi-card kpi-penugasan">
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 5h6"></path>
+                  <path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1Z"></path>
+                  <rect x="4" y="5" width="16" height="16" rx="2.5"></rect>
+                  <path d="M8 11h8M8 15h5"></path>
+                </svg>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Jumlah penugasan</p>
+                <p class="kpi-value" id="kpi-penugasan">—</p>
+                <p class="kpi-meta" id="kpi-penugasan-meta">Memuat data…</p>
+              </div>
+            </article>
+
+            <article class="kpi-card kpi-petugas">
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="8" r="3.2"></circle>
+                  <path d="M3.5 19c.6-3.1 2.8-4.8 5.5-4.8s4.9 1.7 5.5 4.8"></path>
+                  <path d="M16 5.4a3 3 0 0 1 0 5.7M17.5 14.8c2 .5 3.3 2 3.6 4.2"></path>
+                </svg>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Jumlah petugas</p>
+                <p class="kpi-value" id="kpi-petugas">—</p>
+                <p class="kpi-meta" id="kpi-petugas-meta">Memuat data…</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="charts-grid">
+            <article class="card chart-card">
+              <header class="chart-head">
+                <div>
+                  <h3>Honor per Bulan</h3>
+                  <p>Akumulasi honor seluruh petugas pada tahun aktif</p>
+                </div>
+                <span class="badge" id="badge-tahun-bulanan">—</span>
+              </header>
+              <div class="chart-box">
+                <canvas id="chart-bulanan" role="img" aria-label="Grafik batang honor per bulan"></canvas>
+              </div>
+            </article>
+
+            <article class="card chart-card">
+              <header class="chart-head">
+                <div>
+                  <h3>Honor per Jenis Kegiatan</h3>
+                  <p>Komposisi honor menurut jenis kegiatan</p>
+                </div>
+                <span class="badge badge-teal" id="badge-tahun-jenis">—</span>
+              </header>
+              <div class="chart-box chart-box-donut">
+                <canvas id="chart-jenis" role="img" aria-label="Grafik donat honor per jenis kegiatan"></canvas>
+                <div class="chart-empty" id="chart-jenis-kosong" hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3a9 9 0 1 0 9 9h-9V3Z"></path>
+                    <path d="M15 3.6A9 9 0 0 1 20.4 9H15V3.6Z"></path>
+                  </svg>
+                  <p>Belum ada honor pada tahun ini.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <p class="data-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 11v5M12 7.5h.01"></path>
+            </svg>
+            <span>Angka dihitung langsung dari data penugasan tahun <strong id="catatan-tahun">—</strong>. Tidak ada data rekap yang disimpan.</span>
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script type="module" src="/js/dashboard.js"></script>
+</body>
+</html>

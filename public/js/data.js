@@ -87,6 +87,16 @@ function renderPratinjau(hasil, namaFile) {
   const tahun = ringkasan.tahun.length ? ringkasan.tahun.join(', ') : '—';
   const petugasRekap = Number(ringkasan.jumlahPetugasRekap) || 0;
   const kapasitas = Number(ringkasan.kapasitasPetugas) || 0;
+  const kapasitasJenis = Number(ringkasan.kapasitasJenis) || 0;
+  const adaPetugas = Number(ringkasan.jumlahPetugas) > 0;
+  const adaJenis = Number(ringkasan.jumlahJenis) > 0;
+
+  const labelSiap =
+    valid > 0
+      ? `${formatAngka(valid)} baris siap`
+      : adaPetugas || adaJenis
+        ? 'Tanpa baris penugasan'
+        : 'Tidak ada data';
 
   el('import-summary').innerHTML = `
     <div class="import-summary-head">
@@ -98,13 +108,15 @@ function renderPratinjau(hasil, namaFile) {
             : ''
         }</span>
       </div>
-      <span class="badge ${valid > 0 ? 'badge-ok' : 'badge-muted'}">${formatAngka(valid)} baris siap</span>
+      <span class="badge ${valid > 0 ? 'badge-ok' : 'badge-muted'}">${labelSiap}</span>
     </div>
     <dl class="import-facts">
       <div><dt>Petugas</dt><dd>${formatAngka(ringkasan.jumlahPetugas)}${
         kapasitas > 0 ? ` / ${formatAngka(kapasitas)}` : ''
       }</dd></div>
-      <div><dt>Jenis kegiatan</dt><dd>${formatAngka(ringkasan.jumlahJenis)}</dd></div>
+      <div><dt>Jenis kegiatan</dt><dd>${formatAngka(ringkasan.jumlahJenis)}${
+        kapasitasJenis > 0 ? ` / ${formatAngka(kapasitasJenis)}` : ''
+      }</dd></div>
       <div><dt>Tahun analisis (B3)</dt><dd>${
         ringkasan.tahunAnalisis ? formatAngka(ringkasan.tahunAnalisis) : '—'
       }</dd></div>
@@ -143,18 +155,20 @@ function renderPratinjau(hasil, namaFile) {
     el('import-errors').hidden = true;
   }
 
-  // Impor tetap boleh walau belum ada penugasan, asalkan nama petugas/jenis ada
-  // (alur kerja: petugas diisi di Excel dulu, penugasan menyusul di web).
-  const adaMaster = ringkasan.jumlahPetugas > 0 && ringkasan.jumlahJenis > 0;
-  const bolehTerapkan = valid > 0 || adaMaster;
+  // Impor tetap boleh walau belum ada penugasan, asalkan file memuat data master
+  // (petugas dan/atau jenis kegiatan). Alur kerja: isi nama petugas atau daftar
+  // jenis di Excel dulu, penugasan menyusul di web.
+  const bolehTerapkan = valid > 0 || adaPetugas || adaJenis;
+
+  let labelTombol = 'Tidak ada data untuk diterapkan';
+  if (valid > 0) labelTombol = `Terapkan ${formatAngka(valid)} Baris`;
+  else if (adaPetugas && adaJenis) labelTombol = 'Terapkan Petugas & Jenis';
+  else if (adaPetugas) labelTombol = 'Terapkan Daftar Petugas';
+  else if (adaJenis) labelTombol = 'Terapkan Daftar Jenis';
 
   const tombol = el('terapkan-impor');
   tombol.disabled = !bolehTerapkan;
-  tombol.textContent = valid > 0
-    ? `Terapkan ${formatAngka(valid)} Baris`
-    : adaMaster
-      ? 'Terapkan Daftar Petugas'
-      : 'Tidak ada data untuk diterapkan';
+  tombol.textContent = labelTombol;
 
   el('import-preview').hidden = false;
 }
@@ -193,9 +207,9 @@ async function pilihFile(file) {
 
 async function terapkanImpor() {
   if (!state.hasil || state.sibuk) return;
-  const valid = state.hasil.ringkasan.jumlahBaris;
-  const adaMaster =
-    state.hasil.ringkasan.jumlahPetugas > 0 && state.hasil.ringkasan.jumlahJenis > 0;
+  const ringkasan = state.hasil.ringkasan;
+  const valid = ringkasan.jumlahBaris;
+  const adaMaster = ringkasan.jumlahPetugas > 0 || ringkasan.jumlahJenis > 0;
   if (valid === 0 && !adaMaster) {
     toast('Tidak ada data yang bisa diimpor dari file ini.', 'error');
     return;
@@ -205,8 +219,9 @@ async function terapkanImpor() {
   const lanjut = await konfirmasiHapus({
     judul: 'Timpa semua data?',
     html: `<p style="margin:0 0 8px">Data saat ini <strong>${formatAngka(lama)} baris</strong>
-      akan diganti dengan <strong>${formatAngka(valid)} baris</strong> dan
-      <strong>${formatAngka(state.hasil.ringkasan.jumlahPetugas)} petugas</strong> dari
+      akan diganti dengan <strong>${formatAngka(valid)} baris penugasan</strong>,
+      <strong>${formatAngka(ringkasan.jumlahPetugas)} petugas</strong>, dan
+      <strong>${formatAngka(ringkasan.jumlahJenis)} jenis kegiatan</strong> dari
       <strong>${escapeHtml(state.fileNama)}</strong>.</p>
       <p style="margin:0">Backup data lama dibuat otomatis dan bisa dipulihkan dari bagian Pemulihan.</p>`,
     teksTombol: 'Ya, timpa data',
@@ -237,8 +252,10 @@ async function terapkanImpor() {
 
     toast(
       `Impor berhasil: ${formatAngka(valid)} baris, ${formatAngka(
-        state.hasil.ringkasan.jumlahPetugas
-      )} petugas, ${formatAngka(state.hasil.errors.length)} baris dilewati.`
+        ringkasan.jumlahPetugas
+      )} petugas, ${formatAngka(ringkasan.jumlahJenis)} jenis, ${formatAngka(
+        state.hasil.errors.length
+      )} baris dilewati.`
     );
     if (catatanTemplate) toast(catatanTemplate, 'error');
     resetPratinjau();

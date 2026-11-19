@@ -9,6 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import ExcelJS from 'exceljs';
 
 const peta = new Map();
@@ -31,7 +32,9 @@ if (typeof globalThis.CustomEvent === 'undefined') {
 }
 globalThis.ExcelJS = ExcelJS;
 
-const { imporFileExcel, buatWorkbook } = await import('../public/js/store/excel.js');
+const { imporFileExcel, buatWorkbook, buatWorkbookTemplate } = await import(
+  '../public/js/store/excel.js'
+);
 const { simpanDataset, bacaDataset, datasetKosong } = await import(
   '../public/js/store/penyimpanan.js'
 );
@@ -301,6 +304,128 @@ async function uji() {
   );
   assert.ok(hasilTemplate.template && hasilTemplate.template.base64, 'file template disimpan sebagai cetakan');
   console.log('OK impor petugas dari sheet rekap, tahun B3, dan judul jenis');
+
+  // --- File yang hanya berisi sheet Referensi --------------------------------
+  const wbReferensi = new ExcelJS.Workbook();
+  wbReferensi.addWorksheet('Dashboard');
+  const wsDataKosong = wbReferensi.addWorksheet('Data Penugasan');
+  ['No.', 'Nama Petugas', 'Jenis Kegiatan', 'Nama Pekerjaan/Kegiatan', 'Bulan', 'Tahun', 'Honor (Rp)'].forEach(
+    (teks, indeks) => {
+      wsDataKosong.getCell(4, indeks + 1).value = teks;
+    }
+  );
+
+  const wsRefBaru = wbReferensi.addWorksheet('Referensi');
+  wsRefBaru.getCell(1, 1).value = 'DAFTAR JENIS KEGIATAN (dapat diubah sesuai kebutuhan)';
+  ['Pengumpulan Data', 'Pemeriksaan', 'Pelatihan Petugas'].forEach((nama, indeks) => {
+    wsRefBaru.getCell(3 + indeks, 1).value = nama;
+  });
+
+  const wsBulananKosong = wbReferensi.addWorksheet('Rekap Honor Bulanan');
+  wsBulananKosong.getCell('B3').value = 2027;
+
+  // Judul kolom sheet rekap sengaja dibiarkan memakai daftar lama (10 jenis).
+  const wsJenisLama = wbReferensi.addWorksheet('Rekap Jenis Kegiatan');
+  ['Survei', 'Sensus', 'Pengolahan Data', 'Pembinaan Statistik Sektoral', 'Koordinasi'].forEach(
+    (nama, indeks) => {
+      wsJenisLama.getCell(5, 2 + indeks).value = nama;
+    }
+  );
+  wsJenisLama.getCell(5, 7).value = 'Total Honor';
+
+  const bufferReferensi = await wbReferensi.xlsx.writeBuffer();
+  const hasilReferensi = await imporFileExcel({
+    name: 'hanya-referensi.xlsx',
+    arrayBuffer: async () => bufferReferensi,
+  });
+
+  assert.equal(hasilReferensi.ringkasan.jumlahBaris, 0, 'tidak ada penugasan');
+  assert.equal(hasilReferensi.ringkasan.jumlahPetugas, 0, 'tidak ada petugas');
+  assert.deepEqual(
+    hasilReferensi.data.jenis.map((baris) => baris.nama),
+    ['Pengumpulan Data', 'Pemeriksaan', 'Pelatihan Petugas'],
+    'sheet Referensi menjadi sumber tunggal daftar jenis'
+  );
+  assert.equal(hasilReferensi.ringkasan.tahunAnalisis, 2027, 'tahun B3 tetap terbaca');
+  assert.equal(hasilReferensi.data.penugasan.length, 0);
+  assert.ok(
+    hasilReferensi.peringatan.some((pesan) => pesan.includes('judul kolom Rekap Jenis Kegiatan')),
+    'peringatan bahwa judul kolom lama tidak ada di Referensi'
+  );
+  console.log('OK impor file yang hanya berisi sheet Referensi');
+
+  // Hasil impor harus bisa dipakai untuk CRUD jenis lalu diekspor kembali.
+  simpanDataset(hasilReferensi.data);
+  assert.deepEqual(
+    bacaDataset().jenis.map((baris) => baris.nama),
+    ['Pengumpulan Data', 'Pemeriksaan', 'Pelatihan Petugas']
+  );
+  api.buatJenisKegiatan({ nama: 'Pengolahan' });
+  api.ubahJenisKegiatan(hasilReferensi.data.jenis[0].id, { nama: 'Pengumpulan Data (Revisi)' });
+
+  const wbHasil = await buatWorkbookTemplate(bacaDataset(), {
+    tahun: 2027,
+    templateBuffer: fs.readFileSync('public/data/template-matriks.xlsx'),
+  });
+  const refHasil = wbHasil.getWorksheet('Referensi');
+  assert.deepEqual(
+    [3, 4, 5, 6].map((r) => refHasil.getCell(r, 1).value),
+    ['Pengumpulan Data (Revisi)', 'Pemeriksaan', 'Pelatihan Petugas', 'Pengolahan']
+  );
+  assert.equal(refHasil.getCell(7, 1).value, null, 'sisa baris Referensi dibersihkan');
+  const jenisHasil = wbHasil.getWorksheet('Rekap Jenis Kegiatan');
+  assert.deepEqual(
+    [2, 3, 4, 5].map((c) => jenisHasil.getCell(5, c).value),
+    ['Pengumpulan Data (Revisi)', 'Pemeriksaan', 'Pelatihan Petugas', 'Pengolahan'],
+    'judul kolom rekap jenis mengikuti daftar Referensi yang diedit'
+  );
+  assert.equal(jenisHasil.getCell(5, 6).value, null, 'kolom jenis sisa dikosongkan');
+  assert.equal(
+    jenisHasil.getCell(5, 12).value,
+    'Total Honor',
+    'kolom Total Honor tetap di posisi template (L)'
+  );
+  console.log('OK jenis dari Referensi bisa diedit/ditambah lalu diekspor kembali');
+
+  // --- Referensi yang menyusut: jenis lama yang masih dipakai diberi tahu ----
+  const wbSisa = new ExcelJS.Workbook();
+  wbSisa.addWorksheet('Dashboard');
+  const wsSisaData = wbSisa.addWorksheet('Data Penugasan');
+  ['No.', 'Nama Petugas', 'Jenis Kegiatan', 'Nama Pekerjaan/Kegiatan', 'Bulan', 'Tahun', 'Honor (Rp)'].forEach(
+    (teks, indeks) => {
+      wsSisaData.getCell(4, indeks + 1).value = teks;
+    }
+  );
+  wsSisaData.getCell(5, 2).value = 'Petugas Lama';
+  wsSisaData.getCell(5, 3).value = 'Survei';
+  wsSisaData.getCell(5, 4).value = 'SURVEI LAPANGAN';
+  wsSisaData.getCell(5, 5).value = 'Januari';
+  wsSisaData.getCell(5, 6).value = 2027;
+  wsSisaData.getCell(5, 7).value = 500000;
+
+  const wsSisaRef = wbSisa.addWorksheet('Referensi');
+  ['Pengolahan Data', 'Pemeriksaan'].forEach((nama, indeks) => {
+    wsSisaRef.getCell(3 + indeks, 1).value = nama;
+  });
+  wbSisa.addWorksheet('Rekap Honor Bulanan');
+  wbSisa.addWorksheet('Rekap Jenis Kegiatan');
+
+  const bufferSisa = await wbSisa.xlsx.writeBuffer();
+  const hasilSisa = await imporFileExcel({
+    name: 'referensi-menyusut.xlsx',
+    arrayBuffer: async () => bufferSisa,
+  });
+
+  assert.deepEqual(
+    hasilSisa.data.jenis.map((baris) => baris.nama),
+    ['Pengolahan Data', 'Pemeriksaan', 'Survei'],
+    'jenis dari Data Penugasan tetap ditambahkan setelah daftar Referensi'
+  );
+  assert.ok(
+    hasilSisa.peringatan.some((pesan) => pesan.includes('masih dipakai di Data Penugasan')),
+    'peringatan untuk jenis di luar Referensi'
+  );
+  console.log('OK jenis di luar Referensi tetap aman dan diberi peringatan');
 
   console.log('\nSEMUA UJI LULUS');
 }

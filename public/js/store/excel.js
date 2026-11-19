@@ -270,6 +270,7 @@ const STRUKTUR_BAWAAN = {
   kolomJenisAwal: 2,
   kolomJenisAkhir: 11,
   kolomTotalJenis: 12,
+  kolomJenisMaks: 10,
 };
 
 function formulaSel(cell) {
@@ -353,6 +354,12 @@ export function deteksiStrukturTemplate(workbook) {
     }
     struktur.kolomJenisAwal = 2;
     struktur.kolomJenisAkhir = struktur.kolomTotalJenis - 1;
+    // Banyak jenis yang masih muat: sampai kolom sebelum 'Total Honor' bila
+    // kolom total boleh bergeser (kolom terpakai sheet dianggap batas akhir).
+    struktur.kolomJenisMaks = Math.max(
+      Math.max(jenis.columnCount || 0, struktur.kolomTotalJenis) - struktur.kolomJenisAwal,
+      struktur.kolomJenisAkhir - struktur.kolomJenisAwal + 1
+    );
   }
 
   return struktur;
@@ -466,8 +473,11 @@ function bangunDataset(records, { referensi = [], jenisRekap = [], petugasRekap 
     jenis.push(baris);
   };
 
-  for (const nama of referensi) tambahJenis(nama);
-  for (const nama of jenisRekap) tambahJenis(nama);
+  // Sheet "Referensi" adalah sumber utama daftar jenis kegiatan. Judul kolom
+  // sheet "Rekap Jenis Kegiatan" hanya dipakai bila Referensi kosong, karena
+  // pengguna biasanya mengubah daftar jenis di sheet Referensi lebih dulu.
+  const sumberJenis = referensi.length > 0 ? referensi : jenisRekap;
+  for (const nama of sumberJenis) tambahJenis(nama);
   for (const record of records) tambahJenis(record.jenis);
 
   const petugasMap = new Map();
@@ -581,9 +591,38 @@ export async function imporFileExcel(file) {
     const beda = jenisRekap.filter((nama) => !kunciReferensi.has(nama.toLowerCase()));
     if (beda.length > 0) {
       peringatan.push(
-        `${beda.length} judul kolom di Rekap Jenis Kegiatan tidak ada di sheet Referensi: ${beda.slice(0, 3).join(', ')}${beda.length > 3 ? ', …' : ''}.`
+        `${beda.length} judul kolom di Rekap Jenis Kegiatan tidak ada di sheet Referensi sehingga tidak ikut daftar jenis: ${beda.slice(0, 3).join(', ')}${beda.length > 3 ? ', …' : ''}.`
       );
     }
+    const kunciRekap = new Set(jenisRekap.map((nama) => nama.toLowerCase()));
+    const baru = referensi.filter((nama) => !kunciRekap.has(nama.toLowerCase()));
+    if (baru.length > 0) {
+      peringatan.push(
+        `${baru.length} jenis di sheet Referensi belum ada di judul kolom Rekap Jenis Kegiatan (judul kolom diperbarui otomatis saat ekspor): ${baru.slice(0, 3).join(', ')}${baru.length > 3 ? ', …' : ''}.`
+      );
+    }
+  }
+  if (referensi.length > 0) {
+    // Daftar jenis berasal dari sheet Referensi. Bila Data Penugasan masih
+    // memakai jenis yang sudah dihapus dari Referensi, jenis itu tetap
+    // dipertahankan agar penugasan tidak yatim, tetapi pengguna diberi tahu.
+    const kunciReferensi = new Set(referensi.map((nama) => nama.toLowerCase()));
+    const dariPenugasan = new Set();
+    for (const record of records) {
+      const nama = rapikanTeks(record.jenis);
+      if (nama && !kunciReferensi.has(nama.toLowerCase())) dariPenugasan.add(nama);
+    }
+    if (dariPenugasan.size > 0) {
+      const daftar = Array.from(dariPenugasan);
+      peringatan.push(
+        `${daftar.length} jenis masih dipakai di Data Penugasan tetapi tidak ada di sheet Referensi sehingga tetap ditambahkan: ${daftar.slice(0, 3).join(', ')}${daftar.length > 3 ? ', …' : ''}.`
+      );
+    }
+  }
+  if (struktur.kolomJenisMaks > 0 && data.jenis.length > struktur.kolomJenisMaks) {
+    peringatan.push(
+      `Total jenis kegiatan ${data.jenis.length} melebihi kapasitas template ${struktur.kolomJenisMaks} jenis. Kurangi jenis atau tambah kolom pada file template sebelum mengekspor.`
+    );
   }
   if (tahunAnalisis === null) {
     peringatan.push('Sel B3 (tahun analisis) di sheet Rekap Honor Bulanan belum berisi tahun yang sah.');
@@ -595,6 +634,7 @@ export async function imporFileExcel(file) {
     jumlahPetugasRekap: petugasRekap.daftar.length,
     jumlahPetugasTanpaPenugasan: tanpaPenugasan,
     kapasitasPetugas: kapasitas,
+    kapasitasJenis: struktur.kolomJenisMaks,
     kapasitasPenugasan: struktur.dataAkhir - struktur.dataAwal + 1,
   };
 
@@ -868,9 +908,18 @@ function isiDataPenugasan(workbook, dataset, struktur) {
 
 function isiReferensi(workbook, dataset) {
   const sheet = ambilSheet(workbook, NAMA_SHEET_REFERENSI);
-  kosongkan(sheet, 3, 40, 1, 1);
+
+  // Bersihkan dari baris 3 sampai baris terakhir yang masih berisi data, agar
+  // daftar yang menyusut pun tidak menyisakan nama lama.
+  const barisTerakhirSheet = Math.max(sheet.rowCount || 0, 3);
+  let terakhir = 2;
+  for (let baris = 3; baris <= barisTerakhirSheet; baris += 1) {
+    if (rapikanTeks(nilaiSel(sheet.getRow(baris).getCell(1)))) terakhir = baris;
+  }
 
   const jenis = dataset.jenis.slice().sort((a, b) => a.urutan - b.urutan || a.id - b.id);
+  kosongkan(sheet, 3, Math.max(terakhir, jenis.length + 2), 1, 1);
+
   jenis.forEach((data, indeks) => {
     sheet.getCell(3 + indeks, 1).value = data.nama;
   });
@@ -947,13 +996,16 @@ function isiRekapJenis(workbook, dataset, struktur) {
   } = struktur;
 
   const jenis = dataset.jenis.slice().sort((a, b) => a.urutan - b.urutan || a.id - b.id);
-  const kolomTotal = Math.max(kolomTotalJenis, kolomJenisAwal + jenis.length);
-  const batasKolom = Math.max(sheet.columnCount || 0, kolomTotalJenis);
-  if (kolomTotal > batasKolom) {
+  const kapasitasJenis =
+    struktur.kolomJenisMaks || struktur.kolomJenisAkhir - struktur.kolomJenisAwal + 1;
+  if (jenis.length > kapasitasJenis) {
     throw new Error(
-      `Sheet Rekap Jenis Kegiatan pada template hanya muat ${batasKolom - kolomJenisAwal} jenis kegiatan, sedangkan data saat ini ${jenis.length} jenis. Kurangi jenis kegiatan atau tambah kolom pada file template.`
+      `Sheet Rekap Jenis Kegiatan pada template hanya muat ${kapasitasJenis} jenis kegiatan, sedangkan data saat ini ${jenis.length} jenis. Kurangi jenis kegiatan atau tambah kolom pada file template.`
     );
   }
+
+  const kolomTotal = Math.max(kolomTotalJenis, kolomJenisAwal + jenis.length);
+  const batasKolom = Math.max(sheet.columnCount || 0, kolomTotal, kolomTotalJenis);
 
   const petugas = dataset.petugas.slice().sort(
     (a, b) => (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || a.nama.localeCompare(b.nama, 'id')

@@ -72,6 +72,11 @@ sheet rekap atau sheet `Referensi` sudah berisi data. Jadi alur yang disarankan:
 4. Ekspor dengan **Unduh Sesuai Template Excel**; hasilnya memakai struktur file
    yang tadi diimpor, dengan nama petugas dan jenis yang sudah diperbarui.
 
+Bila hanya ingin memakai daftar jenis dari file lama, cukup sisakan sheet
+`Referensi` yang berisi daftar jenis (sheet lain boleh kosong), lalu impor dan
+terapkan. Daftar jenis bisa langsung diedit/ditambah di halaman **Daftar Jenis
+Kegiatan**.
+
 Catatan: **Kosongkan** menghapus penugasan, petugas, dan jenis kegiatan sekaligus.
 Jenis bawaan hanya muncul otomatis saat aplikasi belum pernah menyimpan data,
 jadi setelah dikosongkan jenis perlu ditambahkan lagi secara manual. File template
@@ -83,7 +88,7 @@ file lain.
 Yang dibaca dari file template:
 
 - Sheet `Data Penugasan` — daftar penugasan, satu baris per petugas per kegiatan.
-- Sheet `Referensi` kolom A — daftar jenis kegiatan.
+- Sheet `Referensi` kolom A — daftar jenis kegiatan (sumber utama).
 - Sheet `Rekap Honor Bulanan` kolom A (baris 6 ke bawah) — daftar nama petugas.
 - Sheet `Rekap Jenis Kegiatan` kolom A — daftar nama petugas.
 - Sheet `Rekap Jenis Kegiatan` baris 5 (kolom B dst) — judul kolom jenis kegiatan.
@@ -100,6 +105,27 @@ Header sheet `Data Penugasan` dicari otomatis:
 - Urutan nama petugas mengikuti urutan yang Anda tulis di kolom A sheet rekap.
 - Bila nama hanya ada di salah satu sheet rekap, atau jumlahnya melebihi kapasitas
   template, pratinjau menampilkan peringatan (impor tetap bisa dilanjutkan).
+
+Untuk daftar jenis kegiatan berlaku aturan berikut:
+
+- **Sheet `Referensi` adalah sumber utama.** Bila sheet `Referensi` berisi daftar
+  (baris 3 ke bawah), hanya daftar itulah yang dipakai; judul kolom sheet
+  `Rekap Jenis Kegiatan` diabaikan dan diperbarui otomatis saat ekspor.
+- Bila `Referensi` kosong, judul kolom sheet `Rekap Jenis Kegiatan` dipakai
+  sebagai daftar jenis.
+- Jenis yang masih dipakai di `Data Penugasan` tetapi tidak ada di `Referensi`
+  tetap ditambahkan agar penugasan tidak yatim, dan hal ini diberi peringatan.
+- Jumlah jenis dibatasi kapasitas kolom file template.
+
+#### Impor file yang hanya berisi sheet `Referensi`
+
+File yang seluruh isinya kosong kecuali sheet `Referensi` tetap bisa diimpor:
+pratinjau menampilkan **0 baris penugasan** dan **0 petugas**, tombol berubah
+menjadi **Terapkan Daftar Jenis**, dan setelah diterapkan halaman **Daftar Jenis
+Kegiatan** berisi persis daftar dari `Referensi`. Daftar itu bisa ditambah, diubah,
+atau dihapus di web, lalu **Unduh Sesuai Template Excel** akan menuliskan daftar
+baru ke sheet `Referensi` dan judul kolom sheet `Rekap Jenis Kegiatan` sekaligus
+membersihkan sisa baris/kolom daftar lama.
 
 Nilai dan formula pada sheet rekap tidak dipakai; rekap dihitung ulang di browser
 agar tidak bergantung pada nilai cache formula Excel.
@@ -122,9 +148,10 @@ sebagai cetakan (bila belum pernah impor, dipakai template bawaan
 - Formula total per baris diperbaiki (template asli selalu menunjuk baris pertama).
 
 Batas mengikuti file template yang dipakai. Template bawaan menampung **300 baris**
-penugasan, **100 petugas** (baris 6–105, TOTAL di baris 107), dan **10 jenis**
-kegiatan. Bila data melebihi kapasitas file template, ekspor menolak dengan pesan
-yang menyebutkan batasnya.
+penugasan, **100 petugas** (baris 6–105, TOTAL di baris 107), dan **10 kolom jenis**
+kegiatan (kapasitas terbaca **13 jenis** karena kolom Total Honor bisa bergeser).
+Bila data melebihi kapasitas file template, ekspor menolak dengan pesan yang
+menyebutkan batasnya.
 
 **Unduh Template Kosong** — mengunduh template bawaan yang masih kosong, untuk
 diisi nama petugas di kolom A sheet rekap lalu diimpor kembali.

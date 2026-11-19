@@ -207,6 +207,101 @@ async function uji() {
   assert.equal(bacaDataset().penugasan.length, 5);
   console.log('OK ekspor workbook dan baca ulang');
 
+  // --- CRUD petugas & urutan ------------------------------------------------
+  const petugasBaru = api.buatPetugas({ nama: 'Zulkifli Ahmad' });
+  assert.equal(petugasBaru.data.urutan, api.getPetugas(2026).length, 'petugas baru ditaruh di akhir');
+  assert.throws(
+    () => api.buatPetugas({ nama: 'Zulkifli Ahmad' }),
+    (kesalahan) => kesalahan instanceof ApiError && kesalahan.status === 400,
+    'nama petugas duplikat harus ditolak'
+  );
+  api.ubahPetugas(petugasBaru.data.id, { nama: 'Zulkifli A.' });
+  assert.ok(api.getPetugas(2026).some((baris) => baris.nama === 'Zulkifli A.'));
+  api.hapusPetugas(petugasBaru.data.id);
+  assert.ok(!api.getPetugas(2026).some((baris) => baris.nama === 'Zulkifli A.'));
+  assert.throws(
+    () => api.hapusPetugas(1),
+    (kesalahan) => kesalahan instanceof ApiError && kesalahan.status === 409,
+    'petugas yang punya penugasan tidak boleh dihapus'
+  );
+  console.log('OK CRUD petugas dan aturan hapus');
+
+  // Rekap menampilkan semua petugas, termasuk yang belum punya penugasan.
+  const tanpaPenugasan = api.buatPetugas({ nama: 'Belum Ada Penugasan' });
+  const rekapSemua = api.getRekapBulanan(2026);
+  assert.ok(
+    rekapSemua.baris.some((baris) => baris.nama === 'Belum Ada Penugasan'),
+    'petugas tanpa penugasan tetap muncul di rekap'
+  );
+  assert.equal(rekapSemua.baris.length, api.getPetugas(2026).length);
+  api.hapusPetugas(tanpaPenugasan.data.id);
+  console.log('OK rekap menampilkan seluruh petugas master');
+
+  // --- Impor template: petugas dari sheet rekap, tahun B3, judul jenis -----
+  const wbTemplate = new ExcelJS.Workbook();
+  wbTemplate.addWorksheet('Dashboard');
+  const wsData = wbTemplate.addWorksheet('Data Penugasan');
+  ['No.', 'Nama Petugas', 'Jenis Kegiatan', 'Nama Pekerjaan/Kegiatan', 'Bulan', 'Tahun', 'Honor (Rp)'].forEach(
+    (teks, indeks) => {
+      wsData.getCell(4, indeks + 1).value = teks;
+    }
+  );
+  wsData.getCell(5, 2).value = 'Siti Aminah';
+  wsData.getCell(5, 3).value = 'Sensus';
+  wsData.getCell(5, 4).value = 'SENSUS PENDUDUK';
+  wsData.getCell(5, 5).value = 'Februari';
+  wsData.getCell(5, 6).value = 2026;
+  wsData.getCell(5, 7).value = 2000000;
+
+  const wsRef = wbTemplate.addWorksheet('Referensi');
+  ['Survei', 'Sensus', 'Pengolahan Data'].forEach((nama, indeks) => {
+    wsRef.getCell(3 + indeks, 1).value = nama;
+  });
+
+  const wsBulanan = wbTemplate.addWorksheet('Rekap Honor Bulanan');
+  wsBulanan.getCell('B3').value = 2026;
+  ['Budi Santoso', 'Siti Aminah', 'Andi Wijaya', 'Tanpa Penugasan'].forEach((nama, indeks) => {
+    wsBulanan.getCell(6 + indeks, 1).value = nama;
+  });
+
+  const wsJenis = wbTemplate.addWorksheet('Rekap Jenis Kegiatan');
+  ['Survei', 'Sensus', 'Pengolahan Data'].forEach((nama, indeks) => {
+    wsJenis.getCell(5, 2 + indeks).value = nama;
+  });
+  wsJenis.getCell(5, 5).value = 'Total Honor';
+  ['Siti Aminah', 'Andi Wijaya', 'Tanpa Penugasan'].forEach((nama, indeks) => {
+    wsJenis.getCell(6 + indeks, 1).value = nama;
+  });
+
+  const bufferTemplate = await wbTemplate.xlsx.writeBuffer();
+  const hasilTemplate = await imporFileExcel({
+    name: 'template-petugas.xlsx',
+    arrayBuffer: async () => bufferTemplate,
+  });
+
+  assert.equal(hasilTemplate.ringkasan.tahunAnalisis, 2026, 'tahun B3 terbaca');
+  assert.deepEqual(
+    hasilTemplate.data.petugas.map((baris) => baris.nama),
+    ['Budi Santoso', 'Siti Aminah', 'Andi Wijaya', 'Tanpa Penugasan'],
+    'urutan petugas mengikuti kolom A sheet rekap'
+  );
+  assert.deepEqual(
+    hasilTemplate.data.petugas.map((baris) => baris.urutan),
+    [1, 2, 3, 4],
+    'urutan petugas disimpan'
+  );
+  assert.ok(
+    hasilTemplate.data.jenis.some((baris) => baris.nama === 'Pengolahan Data'),
+    'jenis dari sheet Referensi ikut terbaca'
+  );
+  assert.equal(hasilTemplate.ringkasan.kapasitasPetugas, 4, 'kapasitas petugas terdeteksi dari kolom A');
+  assert.ok(
+    hasilTemplate.peringatan.some((pesan) => pesan.includes('Rekap Honor Bulanan')),
+    'peringatan nama yang hanya ada di salah satu sheet'
+  );
+  assert.ok(hasilTemplate.template && hasilTemplate.template.base64, 'file template disimpan sebagai cetakan');
+  console.log('OK impor petugas dari sheet rekap, tahun B3, dan judul jenis');
+
   console.log('\nSEMUA UJI LULUS');
 }
 

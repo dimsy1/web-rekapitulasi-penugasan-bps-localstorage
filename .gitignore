@@ -39,3 +39,7 @@ backup-dashboard-honor-*.json
 
 # Kecuali template kosong yang dibundel aplikasi
 !public/data/template-matriks.xlsx
+
+# Skrip pemeriksa template sementara (dipakai saat mengembangkan template)
+tests/lihat-*.mjs
+tests/periksa-*.mjs

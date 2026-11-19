@@ -8,6 +8,7 @@ const IKON = {
   bulanan: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M7.5 14h2M12 14h2M16.5 14h.5M7.5 17.5h2M12 17.5h2"/></svg>`,
   jenis: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9V3Z"/><path d="M15 3.6A9 9 0 0 1 20.4 9H15V3.6Z"/></svg>`,
   master: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="2.5"/></svg>`,
+  petugas: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M16 9.5a3 3 0 1 1 0 6"/><path d="M16.5 15.2a5.5 5.5 0 0 1 4 4.3"/></svg>`,
   data: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 15v4.5h16V15"/><path d="M7 19.5h10"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
   chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
@@ -21,6 +22,7 @@ const NAV = [
   { kunci: 'penugasan', href: '/penugasan.html', label: 'Daftar Penugasan', ikon: IKON.penugasan },
   { kunci: 'rekap-bulanan', href: '/rekap-bulanan.html', label: 'Rekap per Bulan', ikon: IKON.bulanan },
   { kunci: 'rekap-jenis', href: '/rekap-jenis.html', label: 'Rekap per Jenis Kegiatan', ikon: IKON.jenis },
+  { kunci: 'master-petugas', href: '/petugas.html', label: 'Daftar Petugas', ikon: IKON.petugas },
   { kunci: 'master-jenis', href: '/master-jenis.html', label: 'Daftar Jenis Kegiatan', ikon: IKON.master },
   { kunci: 'data', href: '/data.html', label: 'Data & Excel', ikon: IKON.data },
 ];

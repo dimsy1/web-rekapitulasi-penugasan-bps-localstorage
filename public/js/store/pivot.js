@@ -67,7 +67,7 @@ export function buatRekapBulanan({ tahun, petugas, penugasan }) {
     target.jumlah_penugasan += 1;
   }
 
-  baris.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  // Urutan baris mengikuti urutan petugas yang diberikan (kolom A sheet rekap).
   return {
     tahun,
     kolom,
@@ -104,7 +104,7 @@ export function buatRekapJenis({ tahun, petugas, jenis, penugasan }) {
     target.jumlah_penugasan += 1;
   }
 
-  baris.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  // Urutan baris mengikuti urutan petugas yang diberikan (kolom A sheet rekap).
   return {
     tahun,
     kolom,

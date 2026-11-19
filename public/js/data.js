@@ -7,8 +7,16 @@ import {
   normalisasiDataset,
   kosongkanData,
   ukuranData,
+  simpanTemplate,
+  bacaTemplate,
 } from './store/penyimpanan.js';
-import { eksporDataset, eksporTemplate, imporFileExcel, ringkasanDataset } from './store/excel.js';
+import {
+  eksporDataset,
+  eksporTemplate,
+  imporFileExcel,
+  ringkasanDataset,
+  unduhTemplateKosong,
+} from './store/excel.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -41,6 +49,16 @@ function perbaruiStatistik() {
   const ukuran = ukuranData();
   el('status-ukuran').textContent =
     ukuran < 1024 ? `${ukuran} B` : `${(ukuran / 1024).toFixed(1)} KB`;
+
+  const template = bacaTemplate();
+  const infoTemplate = el('template-aktif');
+  if (infoTemplate) {
+    infoTemplate.textContent = template
+      ? `Cetakan: ${template.nama} (diimpor ${
+          template.disimpan ? formatTanggal(template.disimpan) : 'sebelumnya'
+        }).`
+      : 'Cetakan: template bawaan aplikasi (100 baris petugas, 300 baris penugasan).';
+  }
 }
 
 function setSibuk(aktif) {
@@ -55,6 +73,8 @@ function resetPratinjau() {
   state.fileNama = '';
   el('import-preview').hidden = true;
   el('import-errors').hidden = true;
+  el('import-warnings').hidden = true;
+  el('import-warnings').innerHTML = '';
   el('error-list').innerHTML = '';
   el('import-summary').innerHTML = '';
   el('file-excel').value = '';
@@ -65,22 +85,43 @@ function renderPratinjau(hasil, namaFile) {
   const valid = ringkasan.jumlahBaris;
   const dilewati = hasil.errors.length;
   const tahun = ringkasan.tahun.length ? ringkasan.tahun.join(', ') : '—';
+  const petugasRekap = Number(ringkasan.jumlahPetugasRekap) || 0;
+  const kapasitas = Number(ringkasan.kapasitasPetugas) || 0;
 
   el('import-summary').innerHTML = `
     <div class="import-summary-head">
       <div>
         <strong>${escapeHtml(namaFile)}</strong>
-        <span>Sheet: ${escapeHtml(hasil.sheet)}</span>
+        <span>Sheet: ${escapeHtml(hasil.sheet)}${
+          petugasRekap > 0
+            ? ` · ${formatAngka(petugasRekap)} nama petugas terbaca dari kolom A sheet rekap`
+            : ''
+        }</span>
       </div>
       <span class="badge ${valid > 0 ? 'badge-ok' : 'badge-muted'}">${formatAngka(valid)} baris siap</span>
     </div>
     <dl class="import-facts">
-      <div><dt>Petugas</dt><dd>${formatAngka(ringkasan.jumlahPetugas)}</dd></div>
+      <div><dt>Petugas</dt><dd>${formatAngka(ringkasan.jumlahPetugas)}${
+        kapasitas > 0 ? ` / ${formatAngka(kapasitas)}` : ''
+      }</dd></div>
       <div><dt>Jenis kegiatan</dt><dd>${formatAngka(ringkasan.jumlahJenis)}</dd></div>
-      <div><dt>Tahun</dt><dd>${escapeHtml(tahun)}</dd></div>
+      <div><dt>Tahun analisis (B3)</dt><dd>${
+        ringkasan.tahunAnalisis ? formatAngka(ringkasan.tahunAnalisis) : '—'
+      }</dd></div>
+      <div><dt>Tahun penugasan</dt><dd>${escapeHtml(tahun)}</dd></div>
       <div><dt>Total honor</dt><dd>${formatRupiah(ringkasan.totalHonor)}</dd></div>
       <div><dt>Baris dilewati</dt><dd>${formatAngka(dilewati)}</dd></div>
     </dl>`;
+
+  if (hasil.peringatan && hasil.peringatan.length > 0) {
+    el('import-warnings').innerHTML = `
+      <h4>Perlu diperhatikan</h4>
+      <ul>${hasil.peringatan.map((pesan) => `<li>${escapeHtml(pesan)}</li>`).join('')}</ul>`;
+    el('import-warnings').hidden = false;
+  } else {
+    el('import-warnings').hidden = true;
+    el('import-warnings').innerHTML = '';
+  }
 
   if (dilewati > 0) {
     const tampil = hasil.errors.slice(0, 80);
@@ -102,10 +143,18 @@ function renderPratinjau(hasil, namaFile) {
     el('import-errors').hidden = true;
   }
 
+  // Impor tetap boleh walau belum ada penugasan, asalkan nama petugas/jenis ada
+  // (alur kerja: petugas diisi di Excel dulu, penugasan menyusul di web).
+  const adaMaster = ringkasan.jumlahPetugas > 0 && ringkasan.jumlahJenis > 0;
+  const bolehTerapkan = valid > 0 || adaMaster;
+
   const tombol = el('terapkan-impor');
-  tombol.disabled = valid === 0;
-  tombol.textContent =
-    valid > 0 ? `Terapkan ${formatAngka(valid)} Baris` : 'Tidak ada baris untuk diterapkan';
+  tombol.disabled = !bolehTerapkan;
+  tombol.textContent = valid > 0
+    ? `Terapkan ${formatAngka(valid)} Baris`
+    : adaMaster
+      ? 'Terapkan Daftar Petugas'
+      : 'Tidak ada data untuk diterapkan';
 
   el('import-preview').hidden = false;
 }
@@ -145,34 +194,53 @@ async function pilihFile(file) {
 async function terapkanImpor() {
   if (!state.hasil || state.sibuk) return;
   const valid = state.hasil.ringkasan.jumlahBaris;
-  if (valid === 0) {
-    toast('Tidak ada baris valid untuk diimpor.', 'error');
+  const adaMaster =
+    state.hasil.ringkasan.jumlahPetugas > 0 && state.hasil.ringkasan.jumlahJenis > 0;
+  if (valid === 0 && !adaMaster) {
+    toast('Tidak ada data yang bisa diimpor dari file ini.', 'error');
     return;
   }
 
   const lama = bacaDataset().penugasan.length;
-  if (lama > 0) {
-    const lanjut = await konfirmasiHapus({
-      judul: 'Timpa semua data?',
-      html: `<p style="margin:0 0 8px">Data saat ini <strong>${formatAngka(lama)} baris</strong>
-        akan diganti dengan <strong>${formatAngka(valid)} baris</strong> dari
-        <strong>${escapeHtml(state.fileNama)}</strong>.</p>
-        <p style="margin:0">Backup data lama dibuat otomatis dan bisa dipulihkan dari bagian Pemulihan.</p>`,
-      teksTombol: 'Ya, timpa data',
-    });
-    if (!lanjut) return;
-  }
+  const lanjut = await konfirmasiHapus({
+    judul: 'Timpa semua data?',
+    html: `<p style="margin:0 0 8px">Data saat ini <strong>${formatAngka(lama)} baris</strong>
+      akan diganti dengan <strong>${formatAngka(valid)} baris</strong> dan
+      <strong>${formatAngka(state.hasil.ringkasan.jumlahPetugas)} petugas</strong> dari
+      <strong>${escapeHtml(state.fileNama)}</strong>.</p>
+      <p style="margin:0">Backup data lama dibuat otomatis dan bisa dipulihkan dari bagian Pemulihan.</p>`,
+    teksTombol: 'Ya, timpa data',
+  });
+  if (!lanjut) return;
 
   const backupBerhasil = simpanBackup(bacaDataset());
   try {
     simpanDataset(state.hasil.data);
-    const tahunTerbaru = state.hasil.ringkasan.tahun[0];
+
+    // Simpan file impor sebagai cetakan ekspor berikutnya.
+    let catatanTemplate = '';
+    if (state.hasil.template) {
+      try {
+        simpanTemplate({
+          nama: state.hasil.template.nama,
+          base64: state.hasil.template.base64,
+          bytes: state.hasil.template.bytes,
+          disimpan: new Date().toISOString(),
+        });
+      } catch (kesalahan) {
+        catatanTemplate = kesalahan.message;
+      }
+    }
+
+    const tahunTerbaru = state.hasil.ringkasan.tahunAnalisis || state.hasil.ringkasan.tahun[0];
     if (tahunTerbaru) setTahunGlobal(tahunTerbaru);
+
     toast(
       `Impor berhasil: ${formatAngka(valid)} baris, ${formatAngka(
-        state.hasil.errors.length
-      )} baris dilewati.`
+        state.hasil.ringkasan.jumlahPetugas
+      )} petugas, ${formatAngka(state.hasil.errors.length)} baris dilewati.`
     );
+    if (catatanTemplate) toast(catatanTemplate, 'error');
     resetPratinjau();
     perbaruiStatistik();
     if (!backupBerhasil) {
@@ -185,7 +253,7 @@ async function terapkanImpor() {
 
 async function ekspor() {
   const data = bacaDataset();
-  if (data.penugasan.length === 0) {
+  if (data.penugasan.length === 0 && data.petugas.length === 0) {
     toast('Belum ada data untuk diekspor.', 'info');
     return;
   }
@@ -199,7 +267,7 @@ async function ekspor() {
 
 async function eksporDenganTemplate() {
   const data = bacaDataset();
-  if (data.penugasan.length === 0) {
+  if (data.penugasan.length === 0 && data.petugas.length === 0) {
     toast('Belum ada data untuk diekspor.', 'info');
     return;
   }
@@ -212,13 +280,34 @@ async function eksporDenganTemplate() {
   tombol.textContent = 'Menyiapkan file…';
 
   try {
-    await eksporTemplate(data, { tahun: bacaTahunAktif() });
+    const template = bacaTemplate();
+    await eksporTemplate(data, {
+      tahun: bacaTahunAktif(),
+      templateBase64: template?.base64,
+    });
     toast('File sesuai template berhasil diunduh.');
   } catch (kesalahan) {
     await dialogPesan('Gagal mengekspor template', kesalahan.message, 'error');
   } finally {
     tombol.disabled = false;
     tombol.innerHTML = isiAsli;
+  }
+}
+
+async function unduhTemplate() {
+  const tombol = el('btn-template-kosong');
+  if (tombol.disabled) return;
+  const isiAsli = tombol.textContent;
+  tombol.disabled = true;
+  tombol.textContent = 'Menyiapkan file…';
+  try {
+    await unduhTemplateKosong();
+    toast('Template kosong berhasil diunduh. Isi nama petugas di kolom A sheet rekap.');
+  } catch (kesalahan) {
+    await dialogPesan('Gagal mengunduh template', kesalahan.message, 'error');
+  } finally {
+    tombol.disabled = false;
+    tombol.textContent = isiAsli;
   }
 }
 
@@ -261,15 +350,16 @@ async function pulihkanBackup(file) {
     const sumber = mentah && typeof mentah === 'object' && mentah.data ? mentah.data : mentah;
     const data = normalisasiDataset(sumber);
 
-    if (data.penugasan.length === 0) {
-      throw new Error('File backup tidak berisi data penugasan.');
+    if (data.penugasan.length === 0 && data.petugas.length === 0) {
+      throw new Error('File backup tidak berisi data petugas maupun penugasan.');
     }
 
     const lama = bacaDataset().penugasan.length;
     const lanjut = await konfirmasiHapus({
       judul: 'Pulihkan backup?',
       html: `<p style="margin:0 0 8px">Data saat ini <strong>${formatAngka(lama)} baris</strong>
-        akan diganti dengan <strong>${formatAngka(data.penugasan.length)} baris</strong>
+        akan diganti dengan <strong>${formatAngka(data.penugasan.length)} baris</strong> dan
+        <strong>${formatAngka(data.petugas.length)} petugas</strong>
         dari file <strong>${escapeHtml(file.name)}</strong>.</p>
         <p style="margin:0">Backup data saat ini dibuat otomatis.</p>`,
       teksTombol: 'Ya, pulihkan',
@@ -294,8 +384,9 @@ async function pulihkanBackup(file) {
 }
 
 async function kosongkan() {
-  const jumlah = bacaDataset().penugasan.length;
-  if (jumlah === 0) {
+  const data = bacaDataset();
+  const jumlah = data.penugasan.length;
+  if (jumlah === 0 && data.petugas.length === 0) {
     toast('Data sudah kosong.', 'info');
     return;
   }
@@ -303,7 +394,9 @@ async function kosongkan() {
   const lanjut = await konfirmasiHapus({
     judul: 'Kosongkan semua data?',
     html: `<p style="margin:0 0 8px">Seluruh <strong>${formatAngka(jumlah)} baris</strong>
-      penugasan, daftar petugas, dan jenis kegiatan akan dihapus dari browser ini.</p>
+      penugasan, <strong>${formatAngka(data.petugas.length)} petugas</strong>, dan
+      <strong>${formatAngka(data.jenis.length)} jenis kegiatan</strong> akan dihapus dari
+      browser ini.</p>
       <p style="margin:0">Backup otomatis dibuat, tetapi sebaiknya unduh file Excel atau backup JSON
       terlebih dahulu.</p>`,
     teksTombol: 'Ya, kosongkan',
@@ -364,6 +457,7 @@ el('batal-impor').addEventListener('click', resetPratinjau);
 el('terapkan-impor').addEventListener('click', terapkanImpor);
 el('btn-ekspor').addEventListener('click', ekspor);
 el('btn-ekspor-template').addEventListener('click', eksporDenganTemplate);
+el('btn-template-kosong').addEventListener('click', unduhTemplate);
 el('btn-backup').addEventListener('click', unduhBackup);
 el('btn-pulihkan').addEventListener('click', () => el('file-backup').click());
 el('file-backup').addEventListener('change', () => {

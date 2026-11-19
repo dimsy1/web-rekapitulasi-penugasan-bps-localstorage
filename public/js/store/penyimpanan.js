@@ -6,7 +6,8 @@
 
 export const KUNCI_DATA = 'dashboard-honor-v2';
 export const KUNCI_BACKUP = 'dashboard-honor-v2-backup';
-export const VERSI_DATA = 1;
+export const KUNCI_TEMPLATE = 'dashboard-honor-v2-template';
+export const VERSI_DATA = 2;
 
 /** Jenis kegiatan bawaan, mengikuti sheet Referensi template Excel. */
 export const JENIS_BAWAAN = [
@@ -95,7 +96,12 @@ export function normalisasiDataset(mentah) {
     const kunci = nama.toLowerCase();
     if (petugasTerpakai.has(kunci)) continue;
     petugasTerpakai.add(kunci);
-    hasil.petugas.push({ id: angkaId(baris.id) || hasil.petugas.length + 1, nama });
+    const urutan = Number(baris?.urutan);
+    hasil.petugas.push({
+      id: angkaId(baris.id) || hasil.petugas.length + 1,
+      nama,
+      urutan: Number.isInteger(urutan) && urutan > 0 ? urutan : hasil.petugas.length + 1,
+    });
   }
   hasil.petugas = urutkanPetugas(hasil.petugas);
 
@@ -147,8 +153,18 @@ export function urutkanJenis(daftar) {
     .sort((a, b) => Number(a.urutan) - Number(b.urutan) || Number(a.id) - Number(b.id));
 }
 
+/**
+ * Urutkan petugas. `urutan` dipertahankan sesuai urutan yang ditulis pengguna
+ * pada kolom A sheet rekap template; nama dipakai sebagai cadangan.
+ */
 export function urutkanPetugas(daftar) {
-  return daftar.slice().sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  return daftar
+    .slice()
+    .sort(
+      (a, b) =>
+        (Number(a.urutan) || 0) - (Number(b.urutan) || 0) ||
+        a.nama.localeCompare(b.nama, 'id')
+    );
 }
 
 /** Baca dataset aktif. Selalu mengembalikan objek valid. */
@@ -217,10 +233,57 @@ export function idBerikutnya(daftar) {
   return daftar.reduce((maks, baris) => Math.max(maks, Number(baris.id) || 0), 0) + 1;
 }
 
-/** Perkiraan ukuran data aktif dalam byte. */
+/* -------------------------------------------------------------------------
+   File template yang diimpor
+
+   Disimpan sebagai teks base64 di kunci terpisah agar struktur dan format file
+   milik pengguna dipakai kembali saat mengekspor.
+   ------------------------------------------------------------------------- */
+export function simpanTemplate(meta) {
+  try {
+    localStorage.setItem(KUNCI_TEMPLATE, JSON.stringify(meta));
+    return true;
+  } catch (kesalahan) {
+    const error = new Error(
+      'File template terlalu besar untuk disimpan di browser. Ekspor akan memakai template bawaan aplikasi.'
+    );
+    error.penyebab = kesalahan;
+    throw error;
+  }
+}
+
+export function bacaTemplate() {
+  try {
+    const mentah = localStorage.getItem(KUNCI_TEMPLATE);
+    if (!mentah) return null;
+    const data = JSON.parse(mentah);
+    if (!data || typeof data.base64 !== 'string' || !data.base64) return null;
+    return {
+      nama: typeof data.nama === 'string' ? data.nama : 'template.xlsx',
+      base64: data.base64,
+      bytes: Number(data.bytes) || Math.floor((data.base64.length * 3) / 4),
+      disimpan: typeof data.disimpan === 'string' ? data.disimpan : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function hapusTemplate() {
+  try {
+    localStorage.removeItem(KUNCI_TEMPLATE);
+  } catch {
+    /* abaikan */
+  }
+}
+
+/** Perkiraan ukuran data aktif (data + file template) dalam byte. */
 export function ukuranData() {
   try {
-    return (localStorage.getItem(KUNCI_DATA) || '').length;
+    return (
+      (localStorage.getItem(KUNCI_DATA) || '').length +
+      (localStorage.getItem(KUNCI_TEMPLATE) || '').length
+    );
   } catch {
     return 0;
   }

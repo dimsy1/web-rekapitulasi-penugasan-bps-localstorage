@@ -58,7 +58,7 @@
               <div class="data-card-head">
                 <div>
                   <h3>Impor dari Excel</h3>
-                  <p>Membaca sheet <code>Data Penugasan</code> dan <code>Referensi</code>.</p>
+                  <p>Membaca sheet <code>Data Penugasan</code>, <code>Referensi</code>, dan kolom A kedua sheet rekap.</p>
                 </div>
                 <span class="badge badge-muted">.xlsx</span>
               </div>
@@ -83,6 +83,7 @@
 
               <div id="import-preview" hidden>
                 <div class="import-summary" id="import-summary"></div>
+                <div class="import-warnings" id="import-warnings" hidden></div>
                 <div class="import-errors" id="import-errors" hidden>
                   <h4>Baris yang tidak dapat diimpor</h4>
                   <div class="error-list" id="error-list"></div>
@@ -94,6 +95,7 @@
                 <p class="import-warning">
                   Impor akan <strong>menimpa seluruh data</strong> yang ada di browser ini.
                   Data lama otomatis dibackup dan dapat dipulihkan dari bagian Pemulihan.
+                  File ini juga disimpan sebagai cetakan ekspor berikutnya.
                 </p>
               </div>
             </section>
@@ -112,6 +114,7 @@
                 Data Penugasan, Referensi, Rekap Honor Bulanan, dan Rekap Jenis Kegiatan.
                 Formula rekap tetap hidup, tahun analisis dan nama petugas terisi otomatis.
               </p>
+              <p class="data-copy" id="template-aktif">Cetakan: template bawaan aplikasi.</p>
 
               <button type="button" class="btn btn-primary btn-block" id="btn-ekspor-template">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -121,9 +124,19 @@
                 Unduh Sesuai Template Excel
               </button>
               <p class="data-meta">
-                Batas template: 300 baris penugasan, 50 petugas, dan 14 jenis kegiatan.
+                Batas baris dan kolom mengikuti file template yang dipakai.
                 Bila data melebihi batas, gunakan ekspor data saja.
               </p>
+
+              <h3 class="data-subhead">Template untuk diisi di Excel</h3>
+              <p class="data-copy">
+                Unduh template kosong yang kapasitasnya sudah diperbesar, isi nama petugas pada
+                kolom A sheet <strong>Rekap Honor Bulanan</strong> dan
+                <strong>Rekap Jenis Kegiatan</strong>, lalu impor kembali ke sini.
+              </p>
+              <button type="button" class="btn btn-secondary btn-block" id="btn-template-kosong">
+                Unduh Template Kosong
+              </button>
 
               <h3 class="data-subhead">Ekspor data saja</h3>
               <p class="data-copy">

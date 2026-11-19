@@ -1,9 +1,17 @@
 /**
  * Impor & ekspor Excel di browser memakai ExcelJS.
  *
- * Impor membaca sheet "Data Penugasan" (dan "Referensi" bila ada).
- * Ekspor membuat workbook baru dengan dua sheet: Data Penugasan dan Referensi.
- * Sheet rekap tidak ditulis karena rekap selalu dihitung ulang oleh web.
+ * Impor membaca seluruh isi template:
+ *   - "Data Penugasan"                : daftar penugasan (satu baris per petugas per kegiatan)
+ *   - "Referensi"                     : daftar jenis kegiatan
+ *   - "Rekap Honor Bulanan" kolom A   : daftar nama petugas (baris 6 dst)
+ *   - "Rekap Jenis Kegiatan" kolom A  : daftar nama petugas
+ *   - "Rekap Jenis Kegiatan" baris 5  : judul kolom jenis kegiatan
+ *   - "Rekap Honor Bulanan" sel B3    : tahun analisis
+ *
+ * Ekspor memakai file template yang diimpor pengguna (bila ada) sebagai cetakan,
+ * sehingga struktur dan formatnya tetap sama. Bila belum ada, dipakai template
+ * bawaan aplikasi di /data/template-matriks.xlsx.
  */
 
 import { normalisasiDataset, rapikanTeks } from './penyimpanan.js';
@@ -11,6 +19,12 @@ import { BULAN, DAFTAR_BULAN } from '../bulan.js';
 
 const NAMA_SHEET_DATA = 'Data Penugasan';
 const NAMA_SHEET_REFERENSI = 'Referensi';
+const NAMA_SHEET_REKAP_BULANAN = 'Rekap Honor Bulanan';
+const NAMA_SHEET_REKAP_JENIS = 'Rekap Jenis Kegiatan';
+
+const SEL_TAHUN_REKAP = 'B3';
+const LABEL_TOTAL_JENIS = 'totalhonor';
+const LABEL_JUMLAH_PENUGASAN = 'jumlahpenugasan';
 
 const PETA_BULAN = {
   januari: 1,
@@ -237,7 +251,209 @@ function bacaReferensi(workbook) {
   return hasil;
 }
 
-function bangunDataset(records, referensi) {
+/* -------------------------------------------------------------------------
+   Struktur template
+
+   Kapasitas dan posisi kolom dibaca dari file template, bukan dipatok di kode,
+   supaya bila pengguna menambah baris/kolom di file sendiri, ekspor ikut.
+   ------------------------------------------------------------------------- */
+const STRUKTUR_BAWAAN = {
+  dataAwal: 5,
+  dataAkhir: 304,
+  petugasAwal: 6,
+  petugasAkhir: 55,
+  barisTotalBulanan: null,
+  kolomBulanAwal: 2,
+  kolomBulanAkhir: 13,
+  kolomTotalBulanan: 14,
+  kolomJumlahPenugasan: 15,
+  kolomJenisAwal: 2,
+  kolomJenisAkhir: 11,
+  kolomTotalJenis: 12,
+};
+
+function formulaSel(cell) {
+  const nilai = cell?.value;
+  if (nilai && typeof nilai === 'object' && typeof nilai.formula === 'string') return nilai.formula;
+  return '';
+}
+
+function kolomDariJudul(sheet, baris, judul) {
+  const target = normalisasiTeks(judul);
+  const batas = Math.max(sheet.columnCount || 0, 15);
+  for (let kolom = 1; kolom <= batas; kolom += 1) {
+    if (normalisasiTeks(nilaiSel(sheet.getRow(baris).getCell(kolom))) === target) return kolom;
+  }
+  return null;
+}
+
+/** Baca kapasitas & posisi kolom dari file template. */
+export function deteksiStrukturTemplate(workbook) {
+  const struktur = { ...STRUKTUR_BAWAAN };
+  const bulanan = cariSheet(workbook, NAMA_SHEET_REKAP_BULANAN);
+  const jenis = cariSheet(workbook, NAMA_SHEET_REKAP_JENIS);
+
+  if (bulanan) {
+    const kolomTotal = kolomDariJudul(bulanan, 5, 'Total Setahun');
+    const kolomJumlah = kolomDariJudul(bulanan, 5, 'Jumlah Penugasan');
+    if (kolomTotal) {
+      struktur.kolomTotalBulanan = kolomTotal;
+      struktur.kolomBulanAwal = 2;
+      struktur.kolomBulanAkhir = kolomTotal - 1;
+    }
+    if (kolomJumlah) struktur.kolomJumlahPenugasan = kolomJumlah;
+
+    // Baris petugas terakhir = baris terakhir yang masih berformula SUMIFS/COUNTIFS.
+    let terakhir = 0;
+    for (let baris = struktur.petugasAwal; baris <= 1000; baris += 1) {
+      const formula = formulaSel(bulanan.getRow(baris).getCell(2));
+      if (formula && /SUMIFS/i.test(formula)) terakhir = baris;
+      if (baris - terakhir > 20 && terakhir > 0) break;
+    }
+    if (terakhir === 0) {
+      // Template tanpa formula: pakai baris terakhir yang berisi nama petugas.
+      for (let baris = struktur.petugasAwal; baris <= struktur.petugasAwal + 999; baris += 1) {
+        const teks = rapikanTeks(nilaiSel(bulanan.getRow(baris).getCell(1)));
+        if (!teks || normalisasiTeks(teks) === 'total') continue;
+        terakhir = baris;
+      }
+    }
+    if (terakhir > 0) struktur.petugasAkhir = terakhir;
+
+    // Baris TOTAL rekap bulanan.
+    for (let baris = struktur.petugasAwal; baris <= struktur.petugasAkhir + 20; baris += 1) {
+      if (normalisasiTeks(nilaiSel(bulanan.getRow(baris).getCell(1))) === 'total') {
+        struktur.barisTotalBulanan = baris;
+        break;
+      }
+    }
+
+    // Rentang sheet Data Penugasan dari formula pertama.
+    const contoh = formulaSel(bulanan.getRow(struktur.petugasAwal).getCell(2));
+    const rentang = contoh.match(/\$([A-Z]+)\$(\d+):\$[A-Z]+\$(\d+)/);
+    if (rentang) {
+      struktur.dataAwal = Number(rentang[2]);
+      struktur.dataAkhir = Number(rentang[3]);
+    }
+  }
+
+  if (jenis) {
+    let akhir = null;
+    for (let kolom = 2; kolom <= Math.max(jenis.columnCount || 0, 15); kolom += 1) {
+      const judul = normalisasiTeks(nilaiSel(jenis.getRow(5).getCell(kolom)));
+      if (!judul) continue;
+      if (judul === LABEL_TOTAL_JENIS) {
+        struktur.kolomTotalJenis = kolom;
+        break;
+      }
+      akhir = kolom;
+    }
+    if (!struktur.kolomTotalJenis || !akhir) {
+      struktur.kolomTotalJenis = (akhir || struktur.kolomJenisAkhir) + 1;
+    }
+    struktur.kolomJenisAwal = 2;
+    struktur.kolomJenisAkhir = struktur.kolomTotalJenis - 1;
+  }
+
+  return struktur;
+}
+
+/** Daftar nama petugas dari kolom A kedua sheet rekap template. */
+export function bacaPetugasRekap(workbook, struktur) {
+  const baca = (namaSheet) => {
+    const sheet = cariSheet(workbook, namaSheet);
+    if (!sheet) return [];
+    const daftar = [];
+    for (let baris = struktur.petugasAwal; baris <= struktur.petugasAkhir; baris += 1) {
+      const teks = rapikanTeks(nilaiSel(sheet.getRow(baris).getCell(1)));
+      if (!teks || teks.length > 150) continue;
+      if (normalisasiTeks(teks) === 'namapetugas') continue;
+      daftar.push(teks);
+    }
+    return daftar;
+  };
+
+  const bulanan = baca(NAMA_SHEET_REKAP_BULANAN);
+  const jenis = baca(NAMA_SHEET_REKAP_JENIS);
+  const daftar = [];
+  const terpakai = new Set();
+  const tambah = (nama) => {
+    const kunci = nama.toLowerCase();
+    if (terpakai.has(kunci)) return;
+    terpakai.add(kunci);
+    daftar.push(nama);
+  };
+  for (const nama of bulanan) tambah(nama);
+  for (const nama of jenis) tambah(nama);
+
+  const setBulanan = new Set(bulanan.map((nama) => nama.toLowerCase()));
+  const setJenis = new Set(jenis.map((nama) => nama.toLowerCase()));
+  const hanyaBulanan = daftar.filter(
+    (nama) => setBulanan.has(nama.toLowerCase()) && !setJenis.has(nama.toLowerCase())
+  );
+  const hanyaJenis = daftar.filter(
+    (nama) => setJenis.has(nama.toLowerCase()) && !setBulanan.has(nama.toLowerCase())
+  );
+
+  return { daftar, jumlahBulanan: bulanan.length, jumlahJenis: jenis.length, hanyaBulanan, hanyaJenis };
+}
+
+/** Tahun analisis dari sel B3 sheet Rekap Honor Bulanan. */
+export function bacaTahunAnalisis(workbook) {
+  const sheet = cariSheet(workbook, NAMA_SHEET_REKAP_BULANAN);
+  if (!sheet) return null;
+  const nilai = nilaiSel(sheet.getCell(SEL_TAHUN_REKAP));
+  return parseTahun(typeof nilai === 'number' ? nilai : String(nilai));
+}
+
+/** Judul kolom jenis kegiatan dari baris 5 sheet Rekap Jenis Kegiatan. */
+export function bacaJenisRekap(workbook, struktur) {
+  const sheet = cariSheet(workbook, NAMA_SHEET_REKAP_JENIS);
+  if (!sheet) return [];
+  const hasil = [];
+  for (let kolom = struktur.kolomJenisAwal; kolom <= struktur.kolomJenisAkhir; kolom += 1) {
+    const teks = rapikanTeks(nilaiSel(sheet.getRow(5).getCell(kolom)));
+    if (!teks || teks.length > 100) continue;
+    if (normalisasiTeks(teks) === LABEL_TOTAL_JENIS) continue;
+    hasil.push(teks);
+  }
+  return hasil;
+}
+
+function bufferKeBase64(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let biner = '';
+  const potongan = 0x8000;
+  for (let mulai = 0; mulai < bytes.length; mulai += potongan) {
+    biner += String.fromCharCode.apply(null, bytes.subarray(mulai, mulai + potongan));
+  }
+  if (typeof btoa === 'function') return btoa(biner);
+  // Padanan untuk lingkungan tanpa btoa (mis. uji Node lama).
+  return Buffer.from(bytes).toString('base64');
+}
+
+export function base64KeBytes(base64) {
+  if (typeof atob === 'function') {
+    const biner = atob(base64);
+    const bytes = new Uint8Array(biner.length);
+    for (let i = 0; i < biner.length; i += 1) bytes[i] = biner.charCodeAt(i);
+    return bytes;
+  }
+  return new Uint8Array(Buffer.from(base64, 'base64'));
+}
+
+/** True bila workbook berisi kelima sheet template. */
+export function sepertiTemplate(workbook) {
+  return [
+    'Dashboard',
+    NAMA_SHEET_DATA,
+    NAMA_SHEET_REFERENSI,
+    NAMA_SHEET_REKAP_BULANAN,
+    NAMA_SHEET_REKAP_JENIS,
+  ].every((nama) => cariSheet(workbook, nama));
+}
+
+function bangunDataset(records, { referensi = [], jenisRekap = [], petugasRekap = [] } = {}) {
   const jenisMap = new Map();
   const jenis = [];
   const tambahJenis = (nama) => {
@@ -251,19 +467,24 @@ function bangunDataset(records, referensi) {
   };
 
   for (const nama of referensi) tambahJenis(nama);
+  for (const nama of jenisRekap) tambahJenis(nama);
   for (const record of records) tambahJenis(record.jenis);
 
   const petugasMap = new Map();
   const petugas = [];
   const tambahPetugas = (nama) => {
     const teks = rapikanTeks(nama);
+    if (!teks) return null;
     const kunci = teks.toLowerCase();
     if (petugasMap.has(kunci)) return petugasMap.get(kunci);
-    const baris = { id: petugas.length + 1, nama: teks };
+    const baris = { id: petugas.length + 1, nama: teks, urutan: petugas.length + 1 };
     petugasMap.set(kunci, baris);
     petugas.push(baris);
     return baris;
   };
+
+  // Nama dari kolom A sheet rekap didahulukan agar urutannya seperti di file.
+  for (const nama of petugasRekap) tambahPetugas(nama);
 
   const penugasan = records.map((record, indeks) => {
     const orang = tambahPetugas(record.petugas);
@@ -279,7 +500,7 @@ function bangunDataset(records, referensi) {
     };
   });
 
-  return normalisasiDataset({ versi: 1, jenis, petugas, penugasan });
+  return normalisasiDataset({ versi: 2, jenis, petugas, penugasan });
 }
 
 export function ringkasanDataset(dataset) {
@@ -317,15 +538,77 @@ export async function imporFileExcel(file) {
     );
   }
 
+  const struktur = deteksiStrukturTemplate(workbook);
   const { records, errors } = bacaBarisData(worksheet);
   const referensi = bacaReferensi(workbook);
-  const data = bangunDataset(records, referensi);
+  const jenisRekap = bacaJenisRekap(workbook, struktur);
+  const petugasRekap = bacaPetugasRekap(workbook, struktur);
+  const tahunAnalisis = bacaTahunAnalisis(workbook);
+
+  const data = bangunDataset(records, {
+    referensi,
+    jenisRekap,
+    petugasRekap: petugasRekap.daftar,
+  });
+
+  const dipakai = new Set(data.penugasan.map((baris) => Number(baris.petugas_id)));
+  const tanpaPenugasan = data.petugas.filter((orang) => !dipakai.has(Number(orang.id))).length;
+
+  const peringatan = [];
+  const kapasitas = struktur.petugasAkhir - struktur.petugasAwal + 1;
+  if (petugasRekap.daftar.length > kapasitas) {
+    peringatan.push(
+      `Template hanya menyediakan ${kapasitas} baris petugas di sheet rekap, sedangkan file memuat ${petugasRekap.daftar.length} nama.`
+    );
+  }
+  if (petugasRekap.hanyaBulanan.length > 0) {
+    peringatan.push(
+      `${petugasRekap.hanyaBulanan.length} nama hanya ada di kolom A sheet Rekap Honor Bulanan: ${petugasRekap.hanyaBulanan.slice(0, 3).join(', ')}${petugasRekap.hanyaBulanan.length > 3 ? ', …' : ''}.`
+    );
+  }
+  if (petugasRekap.hanyaJenis.length > 0) {
+    peringatan.push(
+      `${petugasRekap.hanyaJenis.length} nama hanya ada di kolom A sheet Rekap Jenis Kegiatan: ${petugasRekap.hanyaJenis.slice(0, 3).join(', ')}${petugasRekap.hanyaJenis.length > 3 ? ', …' : ''}.`
+    );
+  }
+  if (data.petugas.length > kapasitas) {
+    peringatan.push(
+      `Total nama petugas (termasuk dari Data Penugasan) ${data.petugas.length} melebihi kapasitas template ${kapasitas}. Kurangi sebelum mengekspor.`
+    );
+  }
+  if (jenisRekap.length > 0 && referensi.length > 0) {
+    const kunciReferensi = new Set(referensi.map((nama) => nama.toLowerCase()));
+    const beda = jenisRekap.filter((nama) => !kunciReferensi.has(nama.toLowerCase()));
+    if (beda.length > 0) {
+      peringatan.push(
+        `${beda.length} judul kolom di Rekap Jenis Kegiatan tidak ada di sheet Referensi: ${beda.slice(0, 3).join(', ')}${beda.length > 3 ? ', …' : ''}.`
+      );
+    }
+  }
+  if (tahunAnalisis === null) {
+    peringatan.push('Sel B3 (tahun analisis) di sheet Rekap Honor Bulanan belum berisi tahun yang sah.');
+  }
+
+  const ringkasan = {
+    ...ringkasanDataset(data),
+    tahunAnalisis,
+    jumlahPetugasRekap: petugasRekap.daftar.length,
+    jumlahPetugasTanpaPenugasan: tanpaPenugasan,
+    kapasitasPetugas: kapasitas,
+    kapasitasPenugasan: struktur.dataAkhir - struktur.dataAwal + 1,
+  };
 
   return {
     data,
     errors,
     sheet: worksheet.name,
-    ringkasan: ringkasanDataset(data),
+    ringkasan,
+    struktur,
+    peringatan,
+    // File template pengguna disimpan sebagai cetakan ekspor.
+    template: sepertiTemplate(workbook)
+      ? { nama: file.name || 'template.xlsx', base64: bufferKeBase64(buffer), bytes: buffer.byteLength }
+      : null,
   };
 }
 
@@ -498,22 +781,23 @@ export async function eksporDataset(dataset, { namaFile } = {}) {
 }
 
 /* -------------------------------------------------------------------------
-   Ekspor mengikuti template asli
+   Ekspor mengikuti template
 
-   File template dibundel di /data/template-matriks.xlsx. Isinya diisi ulang
-   dari data web, sementara formula rekap dan dashboard template dibiarkan
-   hidup supaya rekap di Excel ikut menghitung sendiri.
+   File template yang dipakai:
+     1. file .xlsx yang terakhir diimpor pengguna (disimpan di browser), atau
+     2. template bawaan aplikasi di /data/template-matriks.xlsx.
+
+   Isi Data Penugasan, Referensi, dan nama petugas ditulis ulang dari data web;
+   formula rekap dan dashboard template dibiarkan hidup supaya Excel menghitung
+   sendiri saat file dibuka.
    ------------------------------------------------------------------------- */
-export const BATAS_TEMPLATE = {
-  barisData: 300, // 'Data Penugasan' baris 5..304
-  barisRekapAwal: 6, // baris pertama daftar petugas di sheet rekap
-  barisRekapAkhir: 55, // baris terakhir daftar petugas (50 petugas)
-  kolomJenisMaks: 14, // kolom jenis yang muat sebelum kolom total
+export const TEMPLATE_BAWAAN = {
+  url: '/data/template-matriks.xlsx',
+  namaFile: 'Template_Matriks_Penugasan_dan_Honor_Petugas.xlsx',
   namaSheetData: NAMA_SHEET_DATA,
   namaSheetReferensi: NAMA_SHEET_REFERENSI,
-  namaSheetRekapBulanan: 'Rekap Honor Bulanan',
-  namaSheetRekapJenis: 'Rekap Jenis Kegiatan',
-  urlTemplate: '/data/template-matriks.xlsx',
+  namaSheetRekapBulanan: NAMA_SHEET_REKAP_BULANAN,
+  namaSheetRekapJenis: NAMA_SHEET_REKAP_JENIS,
 };
 
 function ambilSheet(workbook, nama) {
@@ -553,19 +837,20 @@ function urutkanPenugasan(penugasan) {
     .sort((a, b) => a.tahun - b.tahun || a.bulan - b.bulan || a.id - b.id);
 }
 
-function isiDataPenugasanTemplate(workbook, dataset) {
-  const sheet = ambilSheet(workbook, BATAS_TEMPLATE.namaSheetData);
+function isiDataPenugasan(workbook, dataset, struktur) {
+  const sheet = ambilSheet(workbook, NAMA_SHEET_DATA);
   const baris = urutkanPenugasan(dataset.penugasan);
-  if (baris.length > BATAS_TEMPLATE.barisData) {
+  const kapasitas = struktur.dataAkhir - struktur.dataAwal + 1;
+  if (baris.length > kapasitas) {
     throw new Error(
-      `Template Excel hanya menampung ${BATAS_TEMPLATE.barisData} baris penugasan, sedangkan data saat ini ${baris.length} baris. Gunakan "Unduh Data Excel" biasa, atau pisahkan data per tahun.`
+      `Sheet Data Penugasan pada template hanya menampung ${kapasitas} baris, sedangkan data saat ini ${baris.length} baris. Gunakan "Unduh Data Saja" atau pisahkan data per tahun.`
     );
   }
 
-  kosongkan(sheet, 5, 4 + BATAS_TEMPLATE.barisData, 2, 7);
+  kosongkan(sheet, struktur.dataAwal, struktur.dataAkhir, 2, 7);
 
   baris.forEach((data, indeks) => {
-    const nomor = 5 + indeks;
+    const nomor = struktur.dataAwal + indeks;
     const orang = dataset.petugas.find((item) => Number(item.id) === Number(data.petugas_id));
     const jenis = dataset.jenis.find(
       (item) => Number(item.id) === Number(data.jenis_kegiatan_id)
@@ -581,8 +866,8 @@ function isiDataPenugasanTemplate(workbook, dataset) {
   return sheet;
 }
 
-function isiReferensiTemplate(workbook, dataset) {
-  const sheet = ambilSheet(workbook, BATAS_TEMPLATE.namaSheetReferensi);
+function isiReferensi(workbook, dataset) {
+  const sheet = ambilSheet(workbook, NAMA_SHEET_REFERENSI);
   kosongkan(sheet, 3, 40, 1, 1);
 
   const jenis = dataset.jenis.slice().sort((a, b) => a.urutan - b.urutan || a.id - b.id);
@@ -593,51 +878,55 @@ function isiReferensiTemplate(workbook, dataset) {
   return sheet;
 }
 
-function isiRekapBulananTemplate(workbook, daftarPetugas, tahun) {
-  const sheet = ambilSheet(workbook, BATAS_TEMPLATE.namaSheetRekapBulanan);
-  sheet.getCell('B3').value = tahun;
+/** Tulis nama petugas (semua, termasuk yang belum punya penugasan) + formula total. */
+function isiRekapBulanan(workbook, dataset, struktur, tahun) {
+  const sheet = ambilSheet(workbook, NAMA_SHEET_REKAP_BULANAN);
+  const {
+    petugasAwal,
+    petugasAkhir,
+    barisTotalBulanan,
+    kolomTotalBulanan,
+    kolomJumlahPenugasan,
+    dataAwal,
+    dataAkhir,
+  } = struktur;
 
-  const { barisRekapAwal, barisRekapAkhir } = BATAS_TEMPLATE;
-  kosongkan(sheet, barisRekapAwal, barisRekapAkhir, 1, 1);
-  daftarPetugas.forEach((nama, indeks) => {
-    sheet.getCell(barisRekapAwal + indeks, 1).value = nama;
-  });
-
-  return sheet;
-}
-
-function isiRekapJenisTemplate(workbook, daftarJenis, daftarPetugas) {
-  const sheet = ambilSheet(workbook, BATAS_TEMPLATE.namaSheetRekapJenis);
-  const { barisRekapAwal, barisRekapAkhir, kolomJenisMaks } = BATAS_TEMPLATE;
-  const kolomTerakhir = kolomJenisMaks + 2;
-
-  kosongkan(sheet, 5, 5, 2, kolomTerakhir);
-  kosongkan(sheet, barisRekapAwal, barisRekapAkhir, 1, kolomTerakhir);
-
-  daftarJenis.forEach((nama, indeks) => {
-    sheet.getCell(5, 2 + indeks).value = nama;
-  });
-  const kolomTotal = 2 + daftarJenis.length;
-  if (daftarJenis.length > 0) {
-    sheet.getCell(5, kolomTotal).value = 'Total Honor';
+  const kapasitas = petugasAkhir - petugasAwal + 1;
+  const petugas = dataset.petugas.slice().sort(
+    (a, b) => (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || a.nama.localeCompare(b.nama, 'id')
+  );
+  if (petugas.length > kapasitas) {
+    throw new Error(
+      `Sheet Rekap Honor Bulanan pada template hanya menyediakan ${kapasitas} baris petugas, sedangkan data saat ini ${petugas.length} petugas. Kurangi petugas atau tambah baris pada file template.`
+    );
   }
 
-  const kolomJenisAwal = hurufKolom(2);
-  const kolomJenisAkhir = hurufKolom(Math.max(kolomTotal - 1, 2));
+  sheet.getCell(SEL_TAHUN_REKAP).value = tahun;
 
-  for (let baris = barisRekapAwal; baris <= barisRekapAkhir; baris += 1) {
-    sheet.getCell(baris, 1).value = daftarPetugas[baris - barisRekapAwal] || null;
+  kosongkan(sheet, petugasAwal, petugasAkhir, 1, 1);
+  petugas.forEach((orang, indeks) => {
+    sheet.getCell(petugasAwal + indeks, 1).value = orang.nama;
+  });
 
-    daftarJenis.forEach((_, indeks) => {
-      const kolom = 2 + indeks;
-      sheet.getCell(baris, kolom).value = {
-        formula: `IF($A${baris}="","",SUMIFS('Data Penugasan'!$G$5:$G$${4 + BATAS_TEMPLATE.barisData},'Data Penugasan'!$B$5:$B$${4 + BATAS_TEMPLATE.barisData},$A${baris},'Data Penugasan'!$C$5:$C$${4 + BATAS_TEMPLATE.barisData},${hurufKolom(kolom)}$5,'Data Penugasan'!$F$5:$F$${4 + BATAS_TEMPLATE.barisData},$B$3))`,
+  const kolomBulanAkhir = hurufKolom(Math.max(kolomTotalBulanan - 1, 2));
+  for (let baris = petugasAwal; baris <= petugasAkhir; baris += 1) {
+    // Perbaiki formula total yang di template asli menunjuk baris pertama terus.
+    sheet.getCell(baris, kolomTotalBulanan).value = {
+      formula: `IF($A${baris}="","",SUM(B${baris}:${kolomBulanAkhir}${baris}))`,
+    };
+    if (kolomJumlahPenugasan) {
+      sheet.getCell(baris, kolomJumlahPenugasan).value = {
+        formula: `IF($A${baris}="","",COUNTIFS('Data Penugasan'!$B$${dataAwal}:$B$${dataAkhir},$A${baris},'Data Penugasan'!$F$${dataAwal}:$F$${dataAkhir},$B$3))`,
       };
-    });
+    }
+  }
 
-    if (daftarJenis.length > 0) {
-      sheet.getCell(baris, kolomTotal).value = {
-        formula: `IF($A${baris}="","",SUM(${kolomJenisAwal}${baris}:${kolomJenisAkhir}${baris}))`,
+  if (barisTotalBulanan) {
+    const kolomTerakhir = Math.max(kolomTotalBulanan, kolomJumlahPenugasan || kolomTotalBulanan);
+    for (let kolom = 2; kolom <= kolomTerakhir; kolom += 1) {
+      const huruf = hurufKolom(kolom);
+      sheet.getCell(barisTotalBulanan, kolom).value = {
+        formula: `SUM(${huruf}${petugasAwal}:${huruf}${petugasAkhir})`,
       };
     }
   }
@@ -645,17 +934,93 @@ function isiRekapJenisTemplate(workbook, daftarJenis, daftarPetugas) {
   return sheet;
 }
 
-/** Siapkan workbook dari file template yang sudah diisi data web. */
-export async function buatWorkbookTemplate(dataset, { tahun, templateBuffer } = {}) {
-  const exceljs = ambilExcelJS();
-  const tahunAktif = Number(tahun) || new Date().getFullYear();
+/** Tulis judul jenis kegiatan, nama petugas, dan formula rekap per jenis. */
+function isiRekapJenis(workbook, dataset, struktur) {
+  const sheet = ambilSheet(workbook, NAMA_SHEET_REKAP_JENIS);
+  const {
+    petugasAwal,
+    petugasAkhir,
+    kolomJenisAwal,
+    kolomTotalJenis,
+    dataAwal,
+    dataAkhir,
+  } = struktur;
 
+  const jenis = dataset.jenis.slice().sort((a, b) => a.urutan - b.urutan || a.id - b.id);
+  const kolomTotal = Math.max(kolomTotalJenis, kolomJenisAwal + jenis.length);
+  const batasKolom = Math.max(sheet.columnCount || 0, kolomTotalJenis);
+  if (kolomTotal > batasKolom) {
+    throw new Error(
+      `Sheet Rekap Jenis Kegiatan pada template hanya muat ${batasKolom - kolomJenisAwal} jenis kegiatan, sedangkan data saat ini ${jenis.length} jenis. Kurangi jenis kegiatan atau tambah kolom pada file template.`
+    );
+  }
+
+  const petugas = dataset.petugas.slice().sort(
+    (a, b) => (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || a.nama.localeCompare(b.nama, 'id')
+  );
+  const kapasitas = petugasAkhir - petugasAwal + 1;
+  if (petugas.length > kapasitas) {
+    throw new Error(
+      `Sheet Rekap Jenis Kegiatan pada template hanya menyediakan ${kapasitas} baris petugas, sedangkan data saat ini ${petugas.length} petugas. Kurangi petugas atau tambah baris pada file template.`
+    );
+  }
+
+  // B3 di sheet ini biasanya formula ke Rekap Honor Bulanan; hanya diisi bila berupa nilai.
+  const selTahun = sheet.getCell(SEL_TAHUN_REKAP);
+  const nilaiTahun = selTahun.value;
+  const tahunDariBulanan = workbook.getWorksheet(NAMA_SHEET_REKAP_BULANAN)?.getCell(SEL_TAHUN_REKAP)?.value;
+  if (!(nilaiTahun && typeof nilaiTahun === 'object' && nilaiTahun.formula)) {
+    selTahun.value = typeof tahunDariBulanan === 'number' ? tahunDariBulanan : nilaiTahun;
+  }
+
+  const kolomTerakhir = Math.max(kolomTotal, batasKolom);
+  kosongkan(sheet, 5, 5, 2, kolomTerakhir);
+  kosongkan(sheet, petugasAwal, petugasAkhir, 1, kolomTerakhir);
+
+  jenis.forEach((data, indeks) => {
+    sheet.getCell(5, kolomJenisAwal + indeks).value = data.nama;
+  });
+  sheet.getCell(5, kolomTotal).value = 'Total Honor';
+
+  const kolomJenisTerakhir = hurufKolom(Math.max(kolomTotal - 1, kolomJenisAwal));
+  const gayaTotal = sheet.getCell(petugasAwal, kolomTotalJenis).numFmt;
+
+  for (let baris = petugasAwal; baris <= petugasAkhir; baris += 1) {
+    sheet.getCell(baris, 1).value = petugas[baris - petugasAwal]?.nama || null;
+
+    for (let indeks = 0; indeks < jenis.length; indeks += 1) {
+      const kolom = kolomJenisAwal + indeks;
+      const cell = sheet.getCell(baris, kolom);
+      cell.value = {
+        formula: `IF($A${baris}="","",SUMIFS('Data Penugasan'!$G$${dataAwal}:$G$${dataAkhir},'Data Penugasan'!$B$${dataAwal}:$B$${dataAkhir},$A${baris},'Data Penugasan'!$C$${dataAwal}:$C$${dataAkhir},${hurufKolom(kolom)}$5,'Data Penugasan'!$F$${dataAwal}:$F$${dataAkhir},$B$3))`,
+      };
+      if (gayaTotal) cell.numFmt = gayaTotal;
+    }
+
+    const cellTotal = sheet.getCell(baris, kolomTotal);
+    if (jenis.length > 0) {
+      cellTotal.value = {
+        formula: `IF($A${baris}="","",SUM(${hurufKolom(kolomJenisAwal)}${baris}:${kolomJenisTerakhir}${baris}))`,
+      };
+    } else {
+      cellTotal.value = null;
+    }
+    if (gayaTotal) cellTotal.numFmt = gayaTotal;
+  }
+
+  return sheet;
+}
+
+/** Muat file template: dari pengguna, atau template bawaan aplikasi. */
+async function muatTemplate({ templateBuffer, templateBase64 } = {}) {
+  const exceljs = ambilExcelJS();
   let sumber = templateBuffer;
+  if (!sumber && templateBase64) sumber = base64KeBytes(templateBase64);
   if (!sumber) {
     if (typeof fetch !== 'function') {
       throw new Error('File template tidak dapat dimuat di lingkungan ini.');
     }
-    const respons = await fetch(BATAS_TEMPLATE.urlTemplate, { cache: 'no-store' });
+    const respons = await fetch(TEMPLATE_BAWAAN.url, { cache: 'no-store' });
     if (!respons.ok) {
       throw new Error(
         'File template Excel tidak ditemukan. Pastikan berkas data/template-matriks.xlsx tersedia di aplikasi.'
@@ -671,46 +1036,58 @@ export async function buatWorkbookTemplate(dataset, { tahun, templateBuffer } = 
     throw new Error('File template Excel tidak dapat dibaca.');
   }
 
-  const petugasPenugasan = new Set(dataset.penugasan.map((data) => Number(data.petugas_id)));
-  const daftarPetugas = dataset.petugas
-    .filter((orang) => petugasPenugasan.has(Number(orang.id)))
-    .map((orang) => orang.nama)
-    .sort((a, b) => a.localeCompare(b, 'id'));
+  return { workbook, struktur: deteksiStrukturTemplate(workbook) };
+}
 
-  if (daftarPetugas.length > BATAS_TEMPLATE.barisRekapAkhir - BATAS_TEMPLATE.barisRekapAwal + 1) {
-    throw new Error(
-      `Sheet rekap template hanya menampung 50 nama petugas, sedangkan data saat ini ${daftarPetugas.length} petugas. Gunakan "Unduh Data Excel" biasa, atau pecah data per unit kerja.`
-    );
-  }
+/** Siapkan workbook dari file template yang sudah diisi data web. */
+export async function buatWorkbookTemplate(
+  dataset,
+  { tahun, templateBuffer, templateBase64 } = {}
+) {
+  const tahunAktif = Number(tahun) || new Date().getFullYear();
+  const { workbook, struktur } = await muatTemplate({ templateBuffer, templateBase64 });
 
-  const daftarJenis = dataset.jenis
-    .slice()
-    .sort((a, b) => a.urutan - b.urutan || a.id - b.id)
-    .map((data) => data.nama);
-
-  if (daftarJenis.length > BATAS_TEMPLATE.kolomJenisMaks) {
-    throw new Error(
-      `Sheet rekap template hanya menampung ${BATAS_TEMPLATE.kolomJenisMaks} jenis kegiatan, sedangkan data saat ini ${daftarJenis.length} jenis. Kurangi jenis kegiatan atau gunakan "Unduh Data Excel" biasa.`
-    );
-  }
-
-  isiDataPenugasanTemplate(workbook, dataset);
-  isiReferensiTemplate(workbook, dataset);
-  isiRekapBulananTemplate(workbook, daftarPetugas, tahunAktif);
-  isiRekapJenisTemplate(workbook, daftarJenis, daftarPetugas);
+  isiDataPenugasan(workbook, dataset, struktur);
+  isiReferensi(workbook, dataset);
+  isiRekapBulanan(workbook, dataset, struktur, tahunAktif);
+  isiRekapJenis(workbook, dataset, struktur);
 
   workbook.creator = 'Dashboard Honor & Penugasan Petugas';
   workbook.modified = new Date();
+  // Excel menghitung ulang formula saat file dibuka.
+  workbook.calcProperties = { ...(workbook.calcProperties || {}), fullCalcOnLoad: true };
 
   return workbook;
 }
 
-export async function eksporTemplate(dataset, { tahun, namaFile, templateBuffer } = {}) {
-  const workbook = await buatWorkbookTemplate(dataset, { tahun, templateBuffer });
+export async function eksporTemplate(
+  dataset,
+  { tahun, namaFile, templateBuffer, templateBase64 } = {}
+) {
+  const workbook = await buatWorkbookTemplate(dataset, {
+    tahun,
+    templateBuffer,
+    templateBase64,
+  });
   const buffer = await workbook.xlsx.writeBuffer();
   const tahunAktif = Number(tahun) || new Date().getFullYear();
   unduhBlob(
     buffer,
     namaFile || `Matriks_Penugasan_dan_Honor_${tahunAktif}_${capTanggal()}.xlsx`
   );
+}
+
+/** Unduh template bawaan yang masih kosong, untuk diisi nama petugas di Excel. */
+export async function unduhTemplateKosong({ namaFile } = {}) {
+  if (typeof fetch !== 'function') {
+    throw new Error('File template tidak dapat dimuat di lingkungan ini.');
+  }
+  const respons = await fetch(TEMPLATE_BAWAAN.url, { cache: 'no-store' });
+  if (!respons.ok) {
+    throw new Error(
+      'File template Excel tidak ditemukan. Pastikan berkas data/template-matriks.xlsx tersedia di aplikasi.'
+    );
+  }
+  const buffer = await respons.arrayBuffer();
+  unduhBlob(buffer, namaFile || TEMPLATE_BAWAAN.namaFile);
 }

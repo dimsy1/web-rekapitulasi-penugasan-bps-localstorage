@@ -139,9 +139,13 @@ function resolvePetugas(ds, body) {
   const ada = ds.petugas.find((baris) => baris.nama.toLowerCase() === normal);
   if (ada) return ada;
 
-  const petugas = { id: idBerikutnya(ds.petugas), nama };
+  const petugas = { id: idBerikutnya(ds.petugas), nama, urutan: urutanPetugasBaru(ds) };
   ds.petugas.push(petugas);
   return petugas;
+}
+
+function urutanPetugasBaru(ds) {
+  return ds.petugas.reduce((maks, baris) => Math.max(maks, Number(baris.urutan) || 0), 0) + 1;
 }
 
 function daftarSaran(ds) {
@@ -229,6 +233,7 @@ export const api = {
       petugas: urutkanPetugas(ds.petugas).map((baris) => ({
         id: Number(baris.id),
         nama: baris.nama,
+        urutan: Number(baris.urutan),
       })),
       nama_kegiatan: saran.map((nama, indeks) => ({
         id: indeks + 1,
@@ -376,24 +381,98 @@ export const api = {
   getRekapBulanan(tahun) {
     const aktif = tahunDari(tahun);
     const ds = bacaDataset();
-    const rows = ds.penugasan.filter((baris) => Number(baris.tahun) === aktif);
-    const idAda = new Set(rows.map((baris) => Number(baris.petugas_id)));
-    const petugas = urutkanPetugas(ds.petugas.filter((baris) => idAda.has(Number(baris.id))));
+    // Seluruh petugas master ditampilkan (termasuk yang belum punya penugasan),
+    // sama seperti kolom A sheet rekap template.
+    const petugas = urutkanPetugas(ds.petugas);
     return buatRekapBulanan({ tahun: aktif, petugas, penugasan: ds.penugasan });
   },
 
   getRekapJenis(tahun) {
     const aktif = tahunDari(tahun);
     const ds = bacaDataset();
-    const rows = ds.penugasan.filter((baris) => Number(baris.tahun) === aktif);
-    const idAda = new Set(rows.map((baris) => Number(baris.petugas_id)));
-    const petugas = urutkanPetugas(ds.petugas.filter((baris) => idAda.has(Number(baris.id))));
+    const petugas = urutkanPetugas(ds.petugas);
     return buatRekapJenis({
       tahun: aktif,
       petugas,
       jenis: ds.jenis,
       penugasan: ds.penugasan,
     });
+  },
+
+  getPetugas(tahun) {
+    const aktif = tahunDari(tahun);
+    const ds = bacaDataset();
+    return urutkanPetugas(ds.petugas)
+      .map((orang) => {
+        const dipakai = ds.penugasan.filter(
+          (baris) => Number(baris.petugas_id) === Number(orang.id)
+        );
+        const jumlahTahun = dipakai.filter((baris) => Number(baris.tahun) === aktif).length;
+        return {
+          id: Number(orang.id),
+          nama: orang.nama,
+          urutan: Number(orang.urutan),
+          jumlah_penugasan: jumlahTahun,
+          jumlah_penugasan_total: dipakai.length,
+          bisa_dihapus: dipakai.length === 0,
+        };
+      });
+  },
+
+  buatPetugas(body = {}) {
+    const nama = teksField(body.nama, 'nama', 'Nama petugas', { maks: 150 });
+    const ds = bacaDataset();
+    if (ds.petugas.some((baris) => baris.nama.toLowerCase() === nama.toLowerCase())) {
+      throw new ApiError(400, 'Nama petugas sudah ada.', {
+        nama: 'Nama petugas sudah ada.',
+      });
+    }
+    const urutan =
+      body.urutan === undefined || body.urutan === null || body.urutan === ''
+        ? urutanPetugasBaru(ds)
+        : angkaField(body.urutan, 'urutan', 'Urutan', { min: 0, maks: 65535 });
+    const petugas = { id: idBerikutnya(ds.petugas), nama, urutan };
+    ds.petugas.push(petugas);
+    simpanDataset(ds);
+    return { message: 'Petugas berhasil ditambahkan.', data: petugas };
+  },
+
+  ubahPetugas(id, body = {}) {
+    const angka = Number(id);
+    const ds = bacaDataset();
+    const petugas = ds.petugas.find((baris) => Number(baris.id) === angka);
+    if (!petugas) throw new ApiError(404, 'Petugas tidak ditemukan.');
+
+    const nama = teksField(body.nama, 'nama', 'Nama petugas', { maks: 150 });
+    if (
+      ds.petugas.some(
+        (baris) => Number(baris.id) !== angka && baris.nama.toLowerCase() === nama.toLowerCase()
+      )
+    ) {
+      throw new ApiError(400, 'Nama petugas sudah ada.', { nama: 'Nama petugas sudah ada.' });
+    }
+    const urutan =
+      body.urutan === undefined || body.urutan === null || body.urutan === ''
+        ? Number(petugas.urutan) || 0
+        : angkaField(body.urutan, 'urutan', 'Urutan', { min: 0, maks: 65535 });
+
+    petugas.nama = nama;
+    petugas.urutan = urutan;
+    simpanDataset(ds);
+    return { message: 'Petugas berhasil diperbarui.', data: { id: angka, nama, urutan } };
+  },
+
+  hapusPetugas(id) {
+    const angka = Number(id);
+    const ds = bacaDataset();
+    const petugas = ds.petugas.find((baris) => Number(baris.id) === angka);
+    if (!petugas) throw new ApiError(404, 'Petugas tidak ditemukan.');
+    if (ds.penugasan.some((baris) => Number(baris.petugas_id) === angka)) {
+      throw new ApiError(409, 'Petugas ini masih punya data penugasan.');
+    }
+    ds.petugas = ds.petugas.filter((baris) => Number(baris.id) !== angka);
+    simpanDataset(ds);
+    return { message: 'Petugas berhasil dihapus.' };
   },
 
   getJenisKegiatan(tahun) {

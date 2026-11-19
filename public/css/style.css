@@ -1370,6 +1370,11 @@ body.modal-terbuka {
   color: var(--danger);
 }
 
+.field label .opsional {
+  color: #8597ab;
+  font-weight: 600;
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -2283,6 +2288,48 @@ table.dataTable thead .sorting_asc::before {
   border-left: 3px solid var(--amber);
   color: var(--muted);
   font-size: 11px;
+}
+
+#import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.import-warnings {
+  padding: 12px;
+  border: 1px solid #f2dfb9;
+  border-radius: 12px;
+  background: #fffaf1;
+}
+
+.import-warnings h4 {
+  color: #8a6108;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.import-warnings ul {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+  list-style: none;
+}
+
+.import-warnings li {
+  position: relative;
+  padding-left: 13px;
+  color: #7a5b16;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.import-warnings li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #c08a1a;
 }
 
 .data-copy {

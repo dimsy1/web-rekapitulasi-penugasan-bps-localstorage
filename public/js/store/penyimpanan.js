@@ -8,6 +8,29 @@ export const KUNCI_DATA = 'dashboard-honor-v2';
 export const KUNCI_BACKUP = 'dashboard-honor-v2-backup';
 export const VERSI_DATA = 1;
 
+/** Jenis kegiatan bawaan, mengikuti sheet Referensi template Excel. */
+export const JENIS_BAWAAN = [
+  'Survei',
+  'Sensus',
+  'Pengolahan Data',
+  'Pembinaan Statistik Sektoral',
+  'Koordinasi',
+  'Administrasi',
+  'Pengawasan/Monitoring',
+  'Pengolahan dan Analisis',
+  'Diseminasi',
+  'Lainnya',
+];
+
+/** Bentuk baris jenis dari daftar bawaan. */
+export function jenisBawaan() {
+  return JENIS_BAWAAN.map((nama, indeks) => ({
+    id: indeks + 1,
+    nama,
+    urutan: indeks + 1,
+  }));
+}
+
 export function datasetKosong() {
   return {
     versi: VERSI_DATA,
@@ -16,6 +39,14 @@ export function datasetKosong() {
     petugas: [],
     penugasan: [],
   };
+}
+
+/**
+ * Dataset untuk pemakaian pertama: belum ada data, tetapi master jenis sudah
+ * berisi 10 jenis standar agar penugasan bisa langsung diisi.
+ */
+export function datasetAwal() {
+  return { ...datasetKosong(), jenis: jenisBawaan() };
 }
 
 /** Salin objek tanpa referensi bersama. */
@@ -124,7 +155,8 @@ export function urutkanPetugas(daftar) {
 export function bacaDataset() {
   try {
     const mentah = localStorage.getItem(KUNCI_DATA);
-    if (!mentah) return datasetKosong();
+    // Pemakaian pertama: mulai dengan 10 jenis bawaan template.
+    if (!mentah) return datasetAwal();
     return normalisasiDataset(JSON.parse(mentah));
   } catch {
     return datasetKosong();

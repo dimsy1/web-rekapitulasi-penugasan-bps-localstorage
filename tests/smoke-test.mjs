@@ -32,7 +32,9 @@ if (typeof globalThis.CustomEvent === 'undefined') {
 globalThis.ExcelJS = ExcelJS;
 
 const { imporFileExcel, buatWorkbook } = await import('../public/js/store/excel.js');
-const { simpanDataset, bacaDataset } = await import('../public/js/store/penyimpanan.js');
+const { simpanDataset, bacaDataset, datasetKosong } = await import(
+  '../public/js/store/penyimpanan.js'
+);
 const { api, ApiError } = await import('../public/js/api.js');
 
 function buatFixture() {
@@ -71,6 +73,34 @@ function buatFixture() {
 }
 
 async function uji() {
+  // --- Pemakaian pertama: 10 jenis bawaan tersedia tanpa menyentuh data -----
+  const awal = bacaDataset();
+  assert.equal(awal.penugasan.length, 0);
+  assert.equal(awal.petugas.length, 0);
+  assert.deepEqual(
+    awal.jenis.map((baris) => baris.nama),
+    [
+      'Survei',
+      'Sensus',
+      'Pengolahan Data',
+      'Pembinaan Statistik Sektoral',
+      'Koordinasi',
+      'Administrasi',
+      'Pengawasan/Monitoring',
+      'Pengolahan dan Analisis',
+      'Diseminasi',
+      'Lainnya',
+    ],
+    '10 jenis bawaan template harus tersedia saat pertama dipakai'
+  );
+  assert.equal(localStorage.getItem('dashboard-honor-v2'), null, 'membaca belum menulis data');
+
+  // Setelah dikosongkan pengguna, jenis tidak boleh muncul kembali sendiri.
+  simpanDataset(datasetKosong());
+  assert.equal(bacaDataset().jenis.length, 0, 'dataset kosong tersimpan tidak diisi ulang');
+  localStorage.removeItem('dashboard-honor-v2');
+  console.log('OK 10 jenis bawaan saat pertama dipakai');
+
   const wb = buatFixture();
   const buffer = await wb.xlsx.writeBuffer();
   const hasil = await imporFileExcel({

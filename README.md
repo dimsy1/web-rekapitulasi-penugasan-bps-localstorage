@@ -15,7 +15,11 @@ Excel. Cocok di-hosting gratis sebagai situs statis (Vercel, Netlify, GitHub Pag
    diketik bebas dengan saran (autocomplete).
 3. **Rekap per Bulan** — matriks petugas × 12 bulan.
 4. **Rekap per Jenis Kegiatan** — matriks petugas × jenis kegiatan.
-5. **Daftar Jenis Kegiatan** — kelola jenis kegiatan.
+5. **Daftar Jenis Kegiatan** — kelola jenis kegiatan. Saat aplikasi pertama kali
+   dipakai, daftar ini sudah berisi **10 jenis bawaan** dari sheet `Referensi`
+   template Excel: Survei, Sensus, Pengolahan Data, Pembinaan Statistik Sektoral,
+   Koordinasi, Administrasi, Pengawasan/Monitoring, Pengolahan dan Analisis,
+   Diseminasi, dan Lainnya.
 6. **Data & Excel** — impor Excel, ekspor Excel, backup/pemulihan JSON, reset data.
 
 Rekap tidak pernah disimpan. Semua angka dihitung ulang dari daftar penugasan
@@ -35,6 +39,14 @@ memakai ES module dan path absolut (`/css`, `/js`), jadi sajikan dari akar situs
 
 ## Alur pemakaian
 
+Ada dua cara memulai:
+
+**Mulai dari nol (data diisi lewat web)** — daftar jenis kegiatan sudah berisi
+10 jenis bawaan, jadi langsung bisa menambah penugasan di halaman
+**Daftar Penugasan**. Petugas baru otomatis dibuat saat namanya diketik.
+
+**Mulai dari file Excel yang sudah ada**
+
 1. Buka halaman **Data & Excel**.
 2. Klik atau seret file `.xlsx` ke area impor.
 3. Periksa pratinjau (jumlah baris, petugas, tahun, total honor, baris bermasalah).
@@ -42,6 +54,10 @@ memakai ES module dan path absolut (`/css`, `/js`), jadi sajikan dari akar situs
 5. Setelah itu semua perubahan di web tersimpan otomatis di browser.
 6. Untuk arsip atau pindah perangkat: **Unduh Sesuai Template Excel**,
    **Unduh Data Saja**, atau **Unduh Backup JSON**.
+
+Catatan: **Kosongkan** menghapus penugasan, petugas, dan jenis kegiatan sekaligus.
+Jenis bawaan hanya muncul otomatis saat aplikasi belum pernah menyimpan data,
+jadi setelah dikosongkan jenis perlu ditambahkan lagi secara manual.
 
 ### Format Excel yang dibaca
 

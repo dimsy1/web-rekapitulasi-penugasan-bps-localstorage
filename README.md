@@ -40,7 +40,8 @@ memakai ES module dan path absolut (`/css`, `/js`), jadi sajikan dari akar situs
 3. Periksa pratinjau (jumlah baris, petugas, tahun, total honor, baris bermasalah).
 4. Klik **Terapkan Impor**. Data lama ditimpa dan dibackup otomatis.
 5. Setelah itu semua perubahan di web tersimpan otomatis di browser.
-6. Untuk arsip atau pindah perangkat: **Unduh Data Excel** atau **Unduh Backup JSON**.
+6. Untuk arsip atau pindah perangkat: **Unduh Sesuai Template Excel**,
+   **Unduh Data Saja**, atau **Unduh Backup JSON**.
 
 ### Format Excel yang dibaca
 
@@ -60,10 +61,26 @@ bergantung pada nilai cache formula Excel.
 
 ### File hasil ekspor
 
-File `.xlsx` berisi dua sheet:
+Ada dua tombol di halaman **Data & Excel**:
 
-- **Data Penugasan** — 7 kolom, siap dibuka/diolah di Excel.
-- **Referensi** — daftar jenis kegiatan.
+**Unduh Sesuai Template Excel** — mengisi ulang
+`Template_Matriks_Penugasan_dan_Honor_Petugas.xlsx` (dibundel di
+`public/data/template-matriks.xlsx`) sehingga dihasilkan 5 sheet lengkap:
+
+- **Dashboard** dan **Rekap** tidak ditulis nilainya; formula aslinya dibiarkan
+  hidup dan akan menghitung sendiri saat file dibuka di Excel.
+- Tahun analisis (sel `B3` rekap) diisi dari tahun aktif.
+- Nama petugas di kolom A kedua sheet rekap diisi otomatis dari petugas yang
+  punya penugasan, diurutkan menurut nama.
+- Header jenis kegiatan pada sheet **Rekap Jenis Kegiatan** disusun mengikuti
+  daftar jenis di web.
+
+Batas template: **300 baris** penugasan, **50 petugas**, dan **14 jenis
+kegiatan**. Jika data melebihi batas, ekspor akan menolak dengan pesan yang
+menyebutkan batas tersebut.
+
+**Unduh Data Saja (2 sheet)** — hanya **Data Penugasan** (7 kolom) dan
+**Referensi**, tanpa rekap. Cocok untuk impor ulang ke web atau diolah sendiri.
 
 ## Deploy ke Vercel
 

@@ -36,3 +36,6 @@ exports/
 *.xlsx
 *.xls
 backup-dashboard-honor-*.json
+
+# Kecuali template kosong yang dibundel aplikasi
+!public/data/template-matriks.xlsx

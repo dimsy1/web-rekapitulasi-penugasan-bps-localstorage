@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "serve public -l 3000",
     "start": "serve public -l 3000",
-    "test": "node tests/smoke-test.mjs"
+    "test": "node tests/smoke-test.mjs && node tests/template-test.mjs"
   },
   "engines": {
     "node": ">=18"

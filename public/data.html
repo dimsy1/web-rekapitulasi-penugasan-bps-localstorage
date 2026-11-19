@@ -107,17 +107,32 @@
               </div>
 
               <p class="data-copy">
-                File hasil ekspor berisi sheet <strong>Data Penugasan</strong> (7 kolom) dan
-                <strong>Referensi</strong>. Sheet rekap tidak ditulis karena web selalu
-                menghitung ulang rekap dari data penugasan.
+                <strong>Sesuai template</strong> menghasilkan file dengan 5 sheet seperti
+                <code>Template_Matriks_Penugasan_dan_Honor_Petugas.xlsx</code>: Dashboard,
+                Data Penugasan, Referensi, Rekap Honor Bulanan, dan Rekap Jenis Kegiatan.
+                Formula rekap tetap hidup, tahun analisis dan nama petugas terisi otomatis.
               </p>
 
-              <button type="button" class="btn btn-primary btn-block" id="btn-ekspor">
+              <button type="button" class="btn btn-primary btn-block" id="btn-ekspor-template">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M12 3v11"></path><path d="m8 10 4 4 4-4"></path><path d="M4 17v2.5h16V17"></path>
                 </svg>
-                Unduh Data Excel
+                Unduh Sesuai Template Excel
+              </button>
+              <p class="data-meta">
+                Batas template: 300 baris penugasan, 50 petugas, dan 14 jenis kegiatan.
+                Bila data melebihi batas, gunakan ekspor data saja.
+              </p>
+
+              <h3 class="data-subhead">Ekspor data saja</h3>
+              <p class="data-copy">
+                Berisi sheet <strong>Data Penugasan</strong> (7 kolom) dan
+                <strong>Referensi</strong> tanpa rekap, cocok untuk impor ulang ke web
+                atau diolah sendiri.
+              </p>
+              <button type="button" class="btn btn-secondary btn-block" id="btn-ekspor">
+                Unduh Data Saja (2 sheet)
               </button>
 
               <h3 class="data-subhead">Cadangan &amp; pemulihan</h3>

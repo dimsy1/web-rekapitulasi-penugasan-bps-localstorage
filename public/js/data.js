@@ -1,4 +1,4 @@
-import { initLayout, toast, konfirmasiHapus, dialogPesan, setTahunGlobal } from './layout.js';
+import { initLayout, toast, konfirmasiHapus, dialogPesan, setTahunGlobal, bacaTahunAktif } from './layout.js';
 import { escapeHtml, formatAngka, formatRupiah } from './format.js';
 import {
   bacaDataset,
@@ -8,7 +8,7 @@ import {
   kosongkanData,
   ukuranData,
 } from './store/penyimpanan.js';
-import { eksporDataset, imporFileExcel, ringkasanDataset } from './store/excel.js';
+import { eksporDataset, eksporTemplate, imporFileExcel, ringkasanDataset } from './store/excel.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -197,6 +197,31 @@ async function ekspor() {
   }
 }
 
+async function eksporDenganTemplate() {
+  const data = bacaDataset();
+  if (data.penugasan.length === 0) {
+    toast('Belum ada data untuk diekspor.', 'info');
+    return;
+  }
+
+  const tombol = el('btn-ekspor-template');
+  if (tombol.disabled) return;
+
+  const isiAsli = tombol.innerHTML;
+  tombol.disabled = true;
+  tombol.textContent = 'Menyiapkan file…';
+
+  try {
+    await eksporTemplate(data, { tahun: bacaTahunAktif() });
+    toast('File sesuai template berhasil diunduh.');
+  } catch (kesalahan) {
+    await dialogPesan('Gagal mengekspor template', kesalahan.message, 'error');
+  } finally {
+    tombol.disabled = false;
+    tombol.innerHTML = isiAsli;
+  }
+}
+
 function namaBackup() {
   const tanggal = new Date();
   const cap = [
@@ -338,6 +363,7 @@ dropzone.addEventListener('drop', (event) => {
 el('batal-impor').addEventListener('click', resetPratinjau);
 el('terapkan-impor').addEventListener('click', terapkanImpor);
 el('btn-ekspor').addEventListener('click', ekspor);
+el('btn-ekspor-template').addEventListener('click', eksporDenganTemplate);
 el('btn-backup').addEventListener('click', unduhBackup);
 el('btn-pulihkan').addEventListener('click', () => el('file-backup').click());
 el('file-backup').addEventListener('change', () => {

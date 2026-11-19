@@ -220,7 +220,7 @@ function isiSelectJenis(idTerpilih = null, cadangan = '') {
   const select = el('f-jenis');
   const daftar = state.meta?.jenis_kegiatan || [];
   select.innerHTML =
-    '<option value="">— Pilih jenis —</option>' +
+    '<option value="">— Belum diisi —</option>' +
     daftar
       .map((jenis) => `<option value="${jenis.id}">${escapeHtml(jenis.nama)}</option>`)
       .join('');
@@ -303,40 +303,46 @@ function validasiForm() {
     valid = false;
   }
 
-  const jenisId = Number(el('f-jenis').value);
-  if (!Number.isInteger(jenisId) || jenisId <= 0) {
-    errorField('jenis_kegiatan_id', 'Jenis kegiatan wajib dipilih.');
+  // Jenis, pekerjaan, bulan, dan honor boleh kosong. Baris seperti itu tetap
+  // disimpan dan ditandai "Belum lengkap" di tabel.
+  const jenisMentah = el('f-jenis').value;
+  const jenisId = jenisMentah ? Number(jenisMentah) : null;
+  if (jenisMentah && (!Number.isInteger(jenisId) || jenisId <= 0)) {
+    errorField('jenis_kegiatan_id', 'Jenis kegiatan tidak valid.');
     valid = false;
   }
 
   const namaPekerjaan = el('f-nama-pekerjaan').value.trim();
-  if (!namaPekerjaan) {
-    errorField('nama_pekerjaan', 'Nama pekerjaan/kegiatan wajib diisi.');
-    valid = false;
-  } else if (namaPekerjaan.length > 255) {
+  if (namaPekerjaan.length > 255) {
     errorField('nama_pekerjaan', 'Nama pekerjaan/kegiatan maksimal 255 karakter.');
     valid = false;
   }
 
-  const bulan = Number(el('f-bulan').value);
-  if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
-    errorField('bulan', 'Bulan wajib dipilih.');
+  const bulanMentah = el('f-bulan').value;
+  const bulan = bulanMentah ? Number(bulanMentah) : null;
+  if (bulanMentah && (!Number.isInteger(bulan) || bulan < 1 || bulan > 12)) {
+    errorField('bulan', 'Bulan tidak valid.');
     valid = false;
   }
 
-  const tahun = Number(el('f-tahun').value);
-  if (!Number.isInteger(tahun) || tahun < 2020) {
+  const tahunMentah = el('f-tahun').value.trim();
+  const tahun = Number(tahunMentah);
+  if (!tahunMentah) {
+    errorField('tahun', 'Tahun wajib diisi.');
+    valid = false;
+  } else if (!Number.isInteger(tahun) || tahun < 2020) {
     errorField('tahun', 'Tahun harus bilangan bulat minimal 2020.');
     valid = false;
   }
 
-  const honor = angkaDariInput(el('f-honor').value);
-  if (el('f-honor').value.trim() === '') {
-    errorField('honor', 'Honor wajib diisi.');
-    valid = false;
-  } else if (honor === null || honor < 0) {
-    errorField('honor', 'Honor harus berupa angka bulat minimal 0.');
-    valid = false;
+  const honorMentah = el('f-honor').value.trim();
+  let honor = null;
+  if (honorMentah !== '') {
+    honor = angkaDariInput(honorMentah);
+    if (honor === null || honor < 0) {
+      errorField('honor', 'Honor harus berupa angka bulat minimal 0.');
+      valid = false;
+    }
   }
 
   if (!valid) {
@@ -377,7 +383,32 @@ function aksiHtml(row) {
     </div>`;
 }
 
+function badgeBelumDiisi() {
+  return '<span class="badge badge-warn">Belum diisi</span>';
+}
+
+function jenisHtml(row) {
+  return row.jenis_nama ? escapeHtml(row.jenis_nama) : badgeBelumDiisi();
+}
+
+function honorHtml(row) {
+  return row.honor === null || row.honor === undefined
+    ? badgeBelumDiisi()
+    : formatRupiah(row.honor);
+}
+
+function statusHtml(row) {
+  if (row.lengkap) return '<span class="badge badge-ok">Lengkap</span>';
+  const rincian = Array.isArray(row.kosong_label) && row.kosong_label.length
+    ? `Kosong: ${row.kosong_label.join(', ')}`
+    : 'Ada kolom yang masih kosong';
+  return `<span class="badge badge-warn" title="${escapeHtml(rincian)}">Belum lengkap</span>`;
+}
+
 function pekerjaanHtml(row) {
+  if (!row.nama_pekerjaan) {
+    return `<div class="pekerjaan-cell">${badgeBelumDiisi()}</div>`;
+  }
   const kode = row.kode_kegiatan
     ? `<span class="kode">${escapeHtml(row.kode_kegiatan)}</span>`
     : '';
@@ -392,11 +423,12 @@ function barisFallback(row, indeks) {
   return `<tr>
     <td>${indeks + 1}</td>
     <td><span class="cell-primary">${escapeHtml(row.nama_petugas)}</span></td>
-    <td>${escapeHtml(row.jenis_nama)}</td>
+    <td>${jenisHtml(row)}</td>
     <td>${pekerjaanHtml(row)}</td>
     <td>${namaBulan(row.bulan)}</td>
     <td>${row.tahun}</td>
-    <td class="num">${formatRupiah(row.honor)}</td>
+    <td class="num">${honorHtml(row)}</td>
+    <td>${statusHtml(row)}</td>
     <td>${aksiHtml(row)}</td>
   </tr>`;
 }
@@ -422,7 +454,11 @@ function initTabel() {
         data: 'nama_petugas',
         render: (data) => `<span class="cell-primary">${escapeHtml(data)}</span>`,
       },
-      { data: 'jenis_nama', render: (data) => escapeHtml(data) },
+      {
+        data: 'jenis_nama',
+        render: (data, type, row) =>
+          type === 'sort' || type === 'type' ? row.jenis_nama || '' : jenisHtml(row),
+      },
       {
         data: null,
         render: (data, type, row) => pekerjaanHtml(row),
@@ -430,7 +466,7 @@ function initTabel() {
       {
         data: 'bulan',
         render: (data, type, row) => {
-          if (type === 'sort' || type === 'type') return Number(row.bulan);
+          if (type === 'sort' || type === 'type') return Number(row.bulan) || 0;
           return namaBulan(row.bulan);
         },
       },
@@ -438,10 +474,14 @@ function initTabel() {
       {
         data: 'honor',
         className: 'num',
-        render: (data, type) => {
-          if (type === 'sort' || type === 'type') return Number(data);
-          return formatRupiah(data);
+        render: (data, type, row) => {
+          if (type === 'sort' || type === 'type') return Number(row.honor) || 0;
+          return honorHtml(row);
         },
+      },
+      {
+        data: 'lengkap',
+        render: (data, type, row) => statusHtml(row),
       },
       {
         data: null,
@@ -461,7 +501,7 @@ function initTabel() {
     autoWidth: false,
     language: {
       emptyTable:
-        '<div class="dt-empty">Belum ada penugasan untuk filter ini.<br><span>Tambahkan data melalui tombol Tambah Penugasan.</span></div>',
+        '<div class="dt-empty">Belum ada penugasan untuk filter ini.<br><span>Tambahkan data melalui tombol Tambah Penugasan, atau ubah filter status.</span></div>',
       zeroRecords:
         '<div class="dt-empty">Data tidak ditemukan.<br><span>Coba ubah kata kunci atau filter.</span></div>',
       info: 'Menampilkan _START_–_END_ dari _TOTAL_ data',
@@ -489,7 +529,7 @@ function renderTabel() {
   if (!tbody) return;
   tbody.innerHTML = state.rows.length
     ? state.rows.map(barisFallback).join('')
-    : '<tr><td colspan="8"><div class="dt-empty">Belum ada penugasan untuk filter ini.</div></td></tr>';
+    : '<tr><td colspan="9"><div class="dt-empty">Belum ada penugasan untuk filter ini.</div></td></tr>';
 }
 
 function setMemuat(aktif) {
@@ -498,17 +538,23 @@ function setMemuat(aktif) {
 
 async function muat() {
   setMemuat(true);
+  const status = el('filter-status').value;
   const params = {
     tahun: state.tahun,
     bulan: el('filter-bulan').value,
     jenis_id: el('filter-jenis').value,
+    status,
     q: el('cari').value.trim(),
   };
 
   try {
     const hasil = await api.getPenugasan(params);
     state.rows = Array.isArray(hasil.data) ? hasil.data : [];
-    el('jumlah-data').textContent = `${state.rows.length} baris`;
+    const belum = Number(hasil.belum_lengkap) || 0;
+    el('jumlah-data').textContent =
+      !status && belum > 0
+        ? `${state.rows.length} baris · ${belum} belum lengkap`
+        : `${state.rows.length} baris`;
     el('badge-tahun').textContent = `Tahun ${state.tahun}`;
     renderTabel();
   } catch (kesalahan) {
@@ -543,7 +589,7 @@ function bukaModal(row = null) {
   selectBulan.innerHTML =
     '<option value="">— Pilih bulan —</option>' +
     DAFTAR_BULAN.map((bulan) => `<option value="${bulan.angka}">${bulan.nama}</option>`).join('');
-  selectBulan.value = row ? String(row.bulan) : '';
+  selectBulan.value = row && row.bulan ? String(row.bulan) : '';
 
   el('f-nama-pekerjaan').value = row?.nama_pekerjaan || '';
 
@@ -616,8 +662,8 @@ async function hapus(row) {
     judul: 'Hapus penugasan?',
     html: `<p style="margin:0 0 6px">Data berikut akan dihapus permanen:</p>
       <p style="margin:0"><strong>${escapeHtml(row.nama_petugas)}</strong><br>
-      ${escapeHtml(row.nama_pekerjaan)} — ${namaBulan(row.bulan)} ${row.tahun}<br>
-      ${formatRupiah(row.honor)}</p>`,
+      ${escapeHtml(row.nama_pekerjaan || 'Pekerjaan belum diisi')} — ${namaBulan(row.bulan)} ${row.tahun}<br>
+      ${row.honor === null || row.honor === undefined ? 'Honor belum diisi' : formatRupiah(row.honor)}</p>`,
   });
   if (!konfirmasi) return;
 
@@ -712,6 +758,7 @@ el('cari').addEventListener('input', () => {
 
 el('filter-bulan').addEventListener('change', muat);
 el('filter-jenis').addEventListener('change', muat);
+el('filter-status').addEventListener('change', muat);
 el('btn-tambah').addEventListener('click', () => bukaModal());
 // el('btn-ekspor').addEventListener('click', ekspor);
 el('form-penugasan').addEventListener('submit', simpan);

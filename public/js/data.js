@@ -122,6 +122,11 @@ function renderPratinjau(hasil, namaFile) {
       }</dd></div>
       <div><dt>Tahun penugasan</dt><dd>${escapeHtml(tahun)}</dd></div>
       <div><dt>Total honor</dt><dd>${formatRupiah(ringkasan.totalHonor)}</dd></div>
+      <div><dt>Belum lengkap</dt><dd>${
+        Number(ringkasan.jumlahBelumLengkap) > 0
+          ? `${formatAngka(ringkasan.jumlahBelumLengkap)} baris`
+          : '—'
+      }</dd></div>
       <div><dt>Baris dilewati</dt><dd>${formatAngka(dilewati)}</dd></div>
     </dl>`;
 
@@ -197,6 +202,11 @@ async function pilihFile(file) {
         `${formatAngka(hasil.errors.length)} baris dilewati karena datanya tidak valid.`,
         'info'
       );
+    } else if (Number(hasil.ringkasan.jumlahBelumLengkap) > 0) {
+      toast(
+        `${formatAngka(hasil.ringkasan.jumlahBelumLengkap)} baris belum lengkap dan tetap akan diimpor.`,
+        'info'
+      );
     }
   } catch (kesalahan) {
     await dialogPesan('Gagal membaca Excel', kesalahan.message, 'error');
@@ -257,6 +267,12 @@ async function terapkanImpor() {
         state.hasil.errors.length
       )} baris dilewati.`
     );
+    if (Number(ringkasan.jumlahBelumLengkap) > 0) {
+      toast(
+        `${formatAngka(ringkasan.jumlahBelumLengkap)} baris belum lengkap. Buka Daftar Penugasan lalu pilih filter "Belum lengkap" untuk melengkapinya.`,
+        'info'
+      );
+    }
     if (catatanTemplate) toast(catatanTemplate, 'error');
     resetPratinjau();
     perbaruiStatistik();

@@ -39,8 +39,9 @@ export function formatRingkas(nilai) {
 
 /** Isi input honor dengan pemisah ribuan titik. */
 export function formatInputHonor(nilai) {
+  if (nilai === null || nilai === undefined || nilai === '') return '';
   const n = Number(nilai);
-  return Number.isFinite(n) && n > 0 ? angka.format(n) : nilai === 0 ? '0' : '';
+  return Number.isFinite(n) && n >= 0 ? angka.format(n) : '';
 }
 
 /** Baca input honor; null bila bukan angka bulat >= 0. */

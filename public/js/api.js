@@ -11,6 +11,8 @@ import {
   simpanDataset,
   simpanBackup,
   idBerikutnya,
+  kolomKosong,
+  labelKolomKosong,
   rapikanTeks,
   urutkanJenis,
   urutkanPetugas,
@@ -76,6 +78,38 @@ function teksField(nilai, field, label, { maks = 255 } = {}) {
     });
   }
   return teks;
+}
+
+/* --- Validasi kolom opsional (baris penugasan boleh belum lengkap) --- */
+function teksOpsional(nilai, field, label, { maks = 255 } = {}) {
+  const teks = rapikanTeks(nilai);
+  if (teks.length > maks) {
+    throw new ApiError(400, `${label} terlalu panjang.`, {
+      [field]: `${label} maksimal ${maks} karakter.`,
+    });
+  }
+  return teks;
+}
+
+function bilanganOpsional(nilai, field, label, { min = 1, maks = 12 } = {}) {
+  if (nilai === undefined || nilai === null || nilai === '') return null;
+  const angka = Number(nilai);
+  if (!Number.isInteger(angka) || angka < min || angka > maks) {
+    throw new ApiError(400, `${label} tidak valid.`, {
+      [field]: `${label} harus bilangan bulat ${min}–${maks}.`,
+    });
+  }
+  return angka;
+}
+
+function honorOpsional(nilai) {
+  if (nilai === undefined || nilai === null || nilai === '') return null;
+  return honorField(nilai);
+}
+
+function jenisOpsional(ds, nilai) {
+  if (nilai === undefined || nilai === null || nilai === '') return null;
+  return Number(resolveJenis(ds, nilai).id);
 }
 
 function honorField(nilai) {
@@ -170,39 +204,44 @@ function daftarSaran(ds) {
 function barisUntukApi(ds, baris) {
   const petugas = ds.petugas.find((item) => Number(item.id) === Number(baris.petugas_id));
   const jenis = ds.jenis.find((item) => Number(item.id) === Number(baris.jenis_kegiatan_id));
+  const kosong = kolomKosong(baris);
   return {
     id: Number(baris.id),
     petugas_id: Number(baris.petugas_id),
     nama_petugas: petugas?.nama || '-',
-    jenis_kegiatan_id: Number(baris.jenis_kegiatan_id),
-    jenis_nama: jenis?.nama || '-',
+    jenis_kegiatan_id:
+      baris.jenis_kegiatan_id === null || baris.jenis_kegiatan_id === undefined
+        ? null
+        : Number(baris.jenis_kegiatan_id),
+    jenis_nama: jenis?.nama || '',
     nama_kegiatan_id: null,
     kode_kegiatan: null,
-    nama_pekerjaan: baris.nama_pekerjaan,
-    bulan: Number(baris.bulan),
+    nama_pekerjaan: baris.nama_pekerjaan || '',
+    bulan: baris.bulan === null || baris.bulan === undefined ? null : Number(baris.bulan),
     tahun: Number(baris.tahun),
-    honor: Number(baris.honor),
+    honor: baris.honor === null || baris.honor === undefined ? null : Number(baris.honor),
+    lengkap: kosong.length === 0,
+    kosong,
+    kosong_label: kosong.map((kunci) => labelKolomKosong(kunci)),
   };
 }
 
 function validasiPayload(ds, body) {
-  const jenis = resolveJenis(ds, body.jenis_kegiatan_id);
-  const namaPekerjaan =
-    body.nama_pekerjaan !== undefined
-      ? teksField(body.nama_pekerjaan, 'nama_pekerjaan', 'Nama pekerjaan/kegiatan', { maks: 255 })
-      : teksField(
-          body.nama_kegiatan_nama,
-          'nama_pekerjaan',
-          'Nama pekerjaan/kegiatan',
-          { maks: 255 }
-        );
+  const namaPekerjaan = teksOpsional(
+    body.nama_pekerjaan !== undefined ? body.nama_pekerjaan : body.nama_kegiatan_nama,
+    'nama_pekerjaan',
+    'Nama pekerjaan/kegiatan',
+    { maks: 255 }
+  );
 
   return {
-    jenis_kegiatan_id: Number(jenis.id),
+    jenis_kegiatan_id: jenisOpsional(ds, body.jenis_kegiatan_id),
     nama_pekerjaan: namaPekerjaan,
-    bulan: angkaField(body.bulan, 'bulan', 'Bulan', { min: 1, maks: 12 }),
+    // Bulan dan honor boleh kosong: baris tetap disimpan dengan status
+    // "belum lengkap" supaya bisa dilengkapi bertahap.
+    bulan: bilanganOpsional(body.bulan, 'bulan', 'Bulan', { min: 1, maks: 12 }),
     tahun: angkaField(body.tahun, 'tahun', 'Tahun', { min: TAHUN_MIN, maks: TAHUN_MAKS }),
-    honor: honorField(body.honor),
+    honor: honorOpsional(body.honor),
     petugas: resolvePetugas(ds, body),
   };
 }
@@ -270,8 +309,20 @@ export const api = {
       });
     }
 
-    rows = rows.slice().sort((a, b) => a.bulan - b.bulan || a.id - b.id);
-    return { tahun, total: rows.length, data: rows.map((baris) => barisUntukApi(ds, baris)) };
+    const belumLengkap = rows.filter((baris) => kolomKosong(baris).length > 0).length;
+    if (params.status === 'belum') {
+      rows = rows.filter((baris) => kolomKosong(baris).length > 0);
+    } else if (params.status === 'lengkap') {
+      rows = rows.filter((baris) => kolomKosong(baris).length === 0);
+    }
+
+    rows = rows.slice().sort((a, b) => (a.bulan ?? 13) - (b.bulan ?? 13) || a.id - b.id);
+    return {
+      tahun,
+      total: rows.length,
+      belum_lengkap: belumLengkap,
+      data: rows.map((baris) => barisUntukApi(ds, baris)),
+    };
   },
 
   buatPenugasan(body = {}) {

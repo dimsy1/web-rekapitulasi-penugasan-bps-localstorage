@@ -68,7 +68,8 @@ sheet rekap atau sheet `Referensi` sudah berisi data. Jadi alur yang disarankan:
    di Excel (dan ubah kolom A sheet `Referensi` bila perlu).
 2. Impor file tersebut ke web — daftar petugas dan jenis langsung terisi.
 3. Isi penugasan lewat halaman **Daftar Penugasan** (atau rapikan daftar di
-   halaman **Daftar Petugas**).
+   halaman **Daftar Petugas**). Baris yang baru berisi nama petugas dan nama
+   pekerjaan tetap masuk, lalu dilengkapi dengan filter **Belum lengkap**.
 4. Ekspor dengan **Unduh Sesuai Template Excel**; hasilnya memakai struktur file
    yang tadi diimpor, dengan nama petugas dan jenis yang sudah diperbarui.
 
@@ -101,10 +102,28 @@ Header sheet `Data Penugasan` dicari otomatis:
 
 - Bulan menerima nama (`Januari`…`Desember`), singkatan (`Jan`, `Feb`, …), atau angka 1–12.
 - Honor menerima angka Excel maupun teks seperti `Rp 1.500.000`.
-- Baris yang tidak valid dilewati dan ditampilkan pada pratinjau.
+- **Hanya Nama Petugas yang wajib.** Kolom lain boleh kosong: baris tetap diimpor
+  sebagai **belum lengkap** dan bisa dilengkapi di web.
+- Tahun yang kosong ditempatkan pada tahun analisis `B3` agar baris tetap muncul.
+- Baris yang benar-benar tidak valid (misalnya bulan salah tulis) dilewati dan
+  ditampilkan pada pratinjau.
 - Urutan nama petugas mengikuti urutan yang Anda tulis di kolom A sheet rekap.
 - Bila nama hanya ada di salah satu sheet rekap, atau jumlahnya melebihi kapasitas
   template, pratinjau menampilkan peringatan (impor tetap bisa dilanjutkan).
+
+#### Baris belum lengkap
+
+Baris yang jenis kegiatan, pekerjaan, bulan, atau honor-nya masih kosong tetap
+disimpan dan diberi tanda **Belum lengkap** di halaman **Daftar Penugasan**
+(kolom kosong ditampilkan sebagai *Belum diisi*). Gunakan filter status:
+
+- **Semua status** — semua baris.
+- **Belum lengkap** — hanya baris yang masih ada kolom kosong, untuk dirapikan.
+- **Lengkap** — hanya baris yang sudah terisi penuh.
+
+Tombol **Ubah** pada baris seperti ini membuka formulir yang boleh disimpan
+sebagian, jadi jenis dan honor bisa diisi bertahap. Baris belum lengkap tidak
+menambah honor di dashboard/rekap sampai kolomnya terisi.
 
 Untuk daftar jenis kegiatan berlaku aturan berikut:
 
@@ -145,6 +164,8 @@ sebagai cetakan (bila belum pernah impor, dipakai template bawaan
   belum punya penugasan) mengikuti urutan pada halaman **Daftar Petugas**.
 - Header jenis kegiatan pada sheet **Rekap Jenis Kegiatan** disusun mengikuti
   daftar jenis di web.
+- Baris yang belum lengkap ditulis apa adanya: sel jenis/bulan/honor yang kosong
+  dibiarkan kosong agar bisa dilengkapi di Excel.
 - Formula total per baris diperbaiki (template asli selalu menunjuk baris pertama).
 
 Batas mengikuti file template yang dipakai. Template bawaan menampung **300 baris**

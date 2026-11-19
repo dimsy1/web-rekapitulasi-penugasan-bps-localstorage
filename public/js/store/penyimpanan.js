@@ -108,37 +108,83 @@ export function normalisasiDataset(mentah) {
   let idPenugasan = 0;
   for (const baris of Array.isArray(data.penugasan) ? data.penugasan : []) {
     const petugasId = angkaId(baris?.petugas_id);
-    const jenisId = angkaId(baris?.jenis_kegiatan_id);
-    const bulan = Number(baris?.bulan);
-    const tahun = Number(baris?.tahun);
-    const honor = Number(baris?.honor);
-    const pekerjaan = typeof baris?.nama_pekerjaan === 'string' ? rapikanTeks(baris.nama_pekerjaan) : '';
+    // Hanya nama petugas yang wajib: baris setengah jadi (jenis/pekerjaan/
+    // bulan/honor kosong) tetap disimpan agar bisa dilengkapi di web.
+    if (!petugasId) continue;
 
-    if (!petugasId || !jenisId || !pekerjaan) continue;
-    if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) continue;
+    const tahun = Number(baris?.tahun);
     if (!Number.isInteger(tahun) || tahun < 2020) continue;
-    if (!Number.isSafeInteger(honor) || honor < 0) continue;
+
+    let bulan = null;
+    if (baris?.bulan !== undefined && baris.bulan !== null && baris.bulan !== '') {
+      const angkaBulan = Number(baris.bulan);
+      if (Number.isInteger(angkaBulan) && angkaBulan >= 1 && angkaBulan <= 12) bulan = angkaBulan;
+    }
+
+    let honor = null;
+    if (baris?.honor !== undefined && baris.honor !== null && baris.honor !== '') {
+      const angkaHonor = Number(baris.honor);
+      if (Number.isSafeInteger(angkaHonor) && angkaHonor >= 0) honor = angkaHonor;
+    }
 
     idPenugasan += 1;
     hasil.penugasan.push({
       id: angkaId(baris.id) || idPenugasan,
       petugas_id: petugasId,
-      jenis_kegiatan_id: jenisId,
-      nama_pekerjaan: pekerjaan,
+      jenis_kegiatan_id: angkaId(baris?.jenis_kegiatan_id),
+      nama_pekerjaan:
+        typeof baris?.nama_pekerjaan === 'string' ? rapikanTeks(baris.nama_pekerjaan) : '',
       bulan,
       tahun,
       honor,
     });
   }
 
-  // Pastikan semua relasi menunjuk ke master yang ada.
+  // Pastikan relasi petugas/jenis menunjuk ke master yang ada. Jenis yang tidak
+  // ditemukan dikosongkan (baris tetap ada agar bisa diperbaiki), bukan dibuang.
   const idPetugas = new Set(hasil.petugas.map((baris) => baris.id));
   const idJenis = new Set(hasil.jenis.map((baris) => baris.id));
-  hasil.penugasan = hasil.penugasan.filter(
-    (baris) => idPetugas.has(baris.petugas_id) && idJenis.has(baris.jenis_kegiatan_id)
-  );
+  hasil.penugasan = hasil.penugasan
+    .filter((baris) => idPetugas.has(baris.petugas_id))
+    .map((baris) =>
+      baris.jenis_kegiatan_id !== null && !idJenis.has(baris.jenis_kegiatan_id)
+        ? { ...baris, jenis_kegiatan_id: null }
+        : baris
+    );
 
   return hasil;
+}
+
+const LABEL_KOLOM_KOSONG = {
+  jenis: 'jenis kegiatan',
+  pekerjaan: 'nama pekerjaan',
+  bulan: 'bulan',
+  honor: 'honor',
+};
+
+/** Daftar kolom yang masih kosong pada satu baris penugasan. */
+export function kolomKosong(baris) {
+  const kosong = [];
+  if (baris?.jenis_kegiatan_id === null || baris?.jenis_kegiatan_id === undefined) {
+    kosong.push('jenis');
+  }
+  if (!rapikanTeks(baris?.nama_pekerjaan)) kosong.push('pekerjaan');
+  const bulan = Number(baris?.bulan);
+  if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) kosong.push('bulan');
+  const honor = Number(baris?.honor);
+  if (
+    baris?.honor === null ||
+    baris?.honor === undefined ||
+    !Number.isSafeInteger(honor) ||
+    honor < 0
+  ) {
+    kosong.push('honor');
+  }
+  return kosong;
+}
+
+export function labelKolomKosong(kunci) {
+  return LABEL_KOLOM_KOSONG[kunci] || kunci;
 }
 
 export function rapikanTeks(nilai) {

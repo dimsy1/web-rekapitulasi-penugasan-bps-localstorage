@@ -14,7 +14,7 @@
  * bawaan aplikasi di /data/template-matriks.xlsx.
  */
 
-import { normalisasiDataset, rapikanTeks } from './penyimpanan.js';
+import { kolomKosong, normalisasiDataset, rapikanTeks } from './penyimpanan.js';
 import { BULAN, DAFTAR_BULAN } from '../bulan.js';
 
 const NAMA_SHEET_DATA = 'Data Penugasan';
@@ -193,23 +193,33 @@ function bacaBarisData(worksheet) {
     if (kosong) continue;
 
     const masalah = [];
+    // Hanya nama petugas yang wajib. Kolom lain boleh kosong: baris tetap
+    // diimpor sebagai "belum lengkap" supaya bisa diisi di halaman Penugasan.
     if (!petugas) masalah.push('Nama petugas kosong.');
     else if (petugas.length > 150) masalah.push('Nama petugas lebih dari 150 karakter.');
 
-    if (!jenis) masalah.push('Jenis kegiatan kosong.');
-    else if (jenis.length > 100) masalah.push('Jenis kegiatan lebih dari 100 karakter.');
+    if (jenis && jenis.length > 100) masalah.push('Jenis kegiatan lebih dari 100 karakter.');
+    if (pekerjaan && pekerjaan.length > 255) {
+      masalah.push('Nama pekerjaan/kegiatan lebih dari 255 karakter.');
+    }
 
-    if (!pekerjaan) masalah.push('Nama pekerjaan/kegiatan kosong.');
-    else if (pekerjaan.length > 255) masalah.push('Nama pekerjaan/kegiatan lebih dari 255 karakter.');
+    let bulan = null;
+    if (rapikanTeks(bulanMentah) !== '') {
+      bulan = parseBulan(bulanMentah);
+      if (bulan === null) masalah.push('Bulan tidak valid (gunakan Januari–Desember atau 1–12).');
+    }
 
-    const bulan = parseBulan(bulanMentah);
-    if (bulan === null) masalah.push('Bulan tidak valid (gunakan Januari–Desember atau 1–12).');
+    let tahun = null;
+    if (rapikanTeks(tahunMentah) !== '') {
+      tahun = parseTahun(tahunMentah);
+      if (tahun === null) masalah.push('Tahun tidak valid (minimal 2020).');
+    }
 
-    const tahun = parseTahun(tahunMentah);
-    if (tahun === null) masalah.push('Tahun tidak valid (minimal 2020).');
-
-    const honor = parseHonor(honorMentah);
-    if (honor === null) masalah.push('Honor harus angka bulat minimal 0.');
+    let honor = null;
+    if (rapikanTeks(honorMentah) !== '') {
+      honor = parseHonor(honorMentah);
+      if (honor === null) masalah.push('Honor harus angka bulat minimal 0.');
+    }
 
     if (masalah.length > 0) {
       errors.push({ baris: nomor, masalah });
@@ -460,7 +470,15 @@ export function sepertiTemplate(workbook) {
   ].every((nama) => cariSheet(workbook, nama));
 }
 
-function bangunDataset(records, { referensi = [], jenisRekap = [], petugasRekap = [] } = {}) {
+function bangunDataset(
+  records,
+  {
+    referensi = [],
+    jenisRekap = [],
+    petugasRekap = [],
+    tahunDefault = new Date().getFullYear(),
+  } = {}
+) {
   const jenisMap = new Map();
   const jenis = [];
   const tambahJenis = (nama) => {
@@ -498,15 +516,17 @@ function bangunDataset(records, { referensi = [], jenisRekap = [], petugasRekap 
 
   const penugasan = records.map((record, indeks) => {
     const orang = tambahPetugas(record.petugas);
-    const kategori = jenisMap.get(record.jenis.toLowerCase());
+    const kategori = record.jenis ? jenisMap.get(record.jenis.toLowerCase()) : null;
     return {
       id: indeks + 1,
       petugas_id: orang.id,
-      jenis_kegiatan_id: kategori.id,
-      nama_pekerjaan: record.pekerjaan,
-      bulan: record.bulan,
-      tahun: record.tahun,
-      honor: record.honor,
+      jenis_kegiatan_id: kategori ? kategori.id : null,
+      nama_pekerjaan: record.pekerjaan || '',
+      bulan: record.bulan ?? null,
+      // Baris tanpa tahun tetap ditampung pada tahun analisis B3 / tahun aktif,
+      // supaya muncul di halaman Daftar Penugasan untuk dilengkapi.
+      tahun: record.tahun ?? tahunDefault,
+      honor: record.honor ?? null,
     };
   });
 
@@ -521,6 +541,7 @@ export function ringkasanDataset(dataset) {
     jumlahBaris: dataset.penugasan.length,
     jumlahPetugas: dataset.petugas.length,
     jumlahJenis: dataset.jenis.length,
+    jumlahBelumLengkap: dataset.penugasan.filter((baris) => kolomKosong(baris).length > 0).length,
     tahun,
     totalHonor: dataset.penugasan.reduce((total, baris) => total + Number(baris.honor), 0),
   };
@@ -559,12 +580,25 @@ export async function imporFileExcel(file) {
     referensi,
     jenisRekap,
     petugasRekap: petugasRekap.daftar,
+    tahunDefault: tahunAnalisis ?? new Date().getFullYear(),
   });
 
   const dipakai = new Set(data.penugasan.map((baris) => Number(baris.petugas_id)));
   const tanpaPenugasan = data.petugas.filter((orang) => !dipakai.has(Number(orang.id))).length;
+  const belumLengkap = data.penugasan.filter((baris) => kolomKosong(baris).length > 0).length;
+  const tanpaTahun = records.filter((record) => record.tahun === null).length;
 
   const peringatan = [];
+  if (belumLengkap > 0) {
+    peringatan.push(
+      `${belumLengkap} baris belum lengkap (jenis/pekerjaan/bulan/honor kosong) dan tetap disimpan. Lengkapi lewat halaman Daftar Penugasan dengan filter "Belum lengkap".`
+    );
+  }
+  if (tanpaTahun > 0) {
+    peringatan.push(
+      `${tanpaTahun} baris tidak mencantumkan tahun sehingga ditempatkan pada tahun ${tahunAnalisis ?? new Date().getFullYear()} agar tetap bisa dibuka di web.`
+    );
+  }
   const kapasitas = struktur.petugasAkhir - struktur.petugasAwal + 1;
   if (petugasRekap.daftar.length > kapasitas) {
     peringatan.push(

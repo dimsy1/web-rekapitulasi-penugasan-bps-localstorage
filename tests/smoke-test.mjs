@@ -240,6 +240,73 @@ async function uji() {
   api.hapusPetugas(tanpaPenugasan.data.id);
   console.log('OK rekap menampilkan seluruh petugas master');
 
+  // --- Impor baris setengah jadi (hanya nama petugas wajib) -----------------
+  const wbSetengah = new ExcelJS.Workbook();
+  wbSetengah.addWorksheet('Dashboard');
+  const wsSetengah = wbSetengah.addWorksheet('Data Penugasan');
+  ['No.', 'Nama Petugas', 'Jenis Kegiatan', 'Nama Pekerjaan/Kegiatan', 'Bulan', 'Tahun', 'Honor (Rp)'].forEach(
+    (teks, indeks) => {
+      wsSetengah.getCell(4, indeks + 1).value = teks;
+    }
+  );
+  wsSetengah.getCell(5, 2).value = 'Ivan';
+  wsSetengah.getCell(5, 4).value = '(SUSENAS26) SURVEI SOSIAL EKONOMI';
+  wsSetengah.getCell(5, 5).value = 'April';
+  wsSetengah.getCell(5, 6).value = 2026;
+  wsSetengah.getCell(6, 2).value = 'Dimas';
+  wsSetengah.getCell(6, 4).value = '(SE2026) SENSUS EKONOMI 2026';
+  wsSetengah.getCell(6, 5).value = 'Juni';
+  wsSetengah.getCell(6, 6).value = 2026;
+  wsSetengah.getCell(7, 2).value = 'Hanya Nama';
+
+  const wsRefSetengah = wbSetengah.addWorksheet('Referensi');
+  wsRefSetengah.getCell(3, 1).value = 'Survei';
+
+  const wsBulananSetengah = wbSetengah.addWorksheet('Rekap Honor Bulanan');
+  wsBulananSetengah.getCell('B3').value = 2026;
+  wbSetengah.addWorksheet('Rekap Jenis Kegiatan');
+
+  const bufferSetengah = await wbSetengah.xlsx.writeBuffer();
+  const hasilSetengah = await imporFileExcel({
+    name: 'setengah-jadi.xlsx',
+    arrayBuffer: async () => bufferSetengah,
+  });
+
+  assert.equal(hasilSetengah.errors.length, 0, 'baris tanpa jenis/honor tidak dianggap error');
+  assert.equal(hasilSetengah.ringkasan.jumlahBaris, 3);
+  assert.equal(hasilSetengah.ringkasan.jumlahBelumLengkap, 3);
+  assert.equal(hasilSetengah.data.penugasan.length, 3);
+  assert.equal(hasilSetengah.data.penugasan[0].jenis_kegiatan_id, null);
+  assert.equal(hasilSetengah.data.penugasan[0].honor, null);
+  assert.equal(hasilSetengah.data.penugasan[2].bulan, null, 'bulan kosong dibiarkan kosong');
+  assert.equal(hasilSetengah.data.penugasan[2].tahun, 2026, 'tahun kosong ikut tahun analisis');
+  assert.ok(
+    hasilSetengah.peringatan.some((pesan) => pesan.includes('baris belum lengkap')),
+    'peringatan baris belum lengkap'
+  );
+
+  simpanDataset(hasilSetengah.data);
+  const belum = api.getPenugasan({ tahun: 2026, status: 'belum' });
+  assert.equal(belum.total, 3);
+  assert.equal(belum.belum_lengkap, 3);
+  assert.equal(belum.data[0].lengkap, false);
+  assert.ok(belum.data[0].kosong.includes('jenis'));
+  assert.ok(belum.data[0].kosong.includes('honor'));
+  assert.equal(api.getPenugasan({ tahun: 2026, status: 'lengkap' }).total, 0);
+
+  const lengkapi = api.ubahPenugasan(belum.data[0].id, {
+    petugas_nama: 'Ivan',
+    jenis_kegiatan_id: hasilSetengah.data.jenis[0].id,
+    nama_pekerjaan: '(SUSENAS26) SURVEI SOSIAL EKONOMI',
+    bulan: 4,
+    tahun: 2026,
+    honor: 1700000,
+  });
+  assert.equal(lengkapi.data.lengkap, true);
+  assert.equal(api.getPenugasan({ tahun: 2026, status: 'belum' }).total, 2);
+  assert.equal(api.getPenugasan({ tahun: 2026, status: 'lengkap' }).total, 1);
+  console.log('OK baris belum lengkap diimpor, difilter, dan bisa dilengkapi');
+
   // --- Impor template: petugas dari sheet rekap, tahun B3, judul jenis -----
   const wbTemplate = new ExcelJS.Workbook();
   wbTemplate.addWorksheet('Dashboard');

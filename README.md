@@ -57,8 +57,7 @@ Ada dua cara memulai:
    bermasalah, dan catatan bila ada nama yang tidak konsisten).
 4. Klik **Terapkan Impor**. Data lama ditimpa dan dibackup otomatis.
 5. Setelah itu semua perubahan di web tersimpan otomatis di browser.
-6. Untuk arsip atau pindah perangkat: **Unduh Sesuai Template Excel**,
-   **Unduh Data Saja**, atau **Unduh Backup JSON**.
+6. Untuk arsip atau pindah perangkat: **Unduh Sesuai Template Excel**.
 
 Impor boleh dilakukan walau sheet `Data Penugasan` masih kosong, asalkan kolom A
 sheet rekap atau sheet `Referensi` sudah berisi data. Jadi alur yang disarankan:
@@ -177,8 +176,10 @@ menyebutkan batasnya.
 **Unduh Template Kosong** — mengunduh template bawaan yang masih kosong, untuk
 diisi nama petugas di kolom A sheet rekap lalu diimpor kembali.
 
-**Unduh Data Saja (2 sheet)** — hanya **Data Penugasan** (7 kolom) dan
-**Referensi**, tanpa rekap. Cocok untuk impor ulang ke web atau diolah sendiri.
+> Ekspor data saja (2 sheet) dan cadangan JSON tidak ditampilkan di antarmuka.
+> Kodenya masih tersimpan (dikomentari) di `public/data.html` dan
+> `public/js/data.js` bila suatu saat diperlukan. Untuk arsip, gunakan
+> **Unduh Sesuai Template Excel**.
 
 ## Deploy ke Vercel
 

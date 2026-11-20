@@ -94,7 +94,7 @@
                 </div>
                 <p class="import-warning">
                   Impor akan <strong>menimpa seluruh data</strong> yang ada di browser ini.
-                  Data lama otomatis dibackup dan dapat dipulihkan dari bagian Pemulihan.
+                  Data lama otomatis dicadangkan di browser ini sebelum ditimpa.
                   File ini juga disimpan sebagai cetakan ekspor berikutnya.
                 </p>
               </div>
@@ -125,7 +125,7 @@
               </button>
               <p class="data-meta">
                 Batas baris dan kolom mengikuti file template yang dipakai.
-                Bila data melebihi batas, gunakan ekspor data saja.
+                Bila data melebihi batas, kurangi jumlah baris atau petugas sebelum mengekspor.
               </p>
 
               <h3 class="data-subhead">Template untuk diisi di Excel</h3>
@@ -138,6 +138,7 @@
                 Unduh Template Kosong
               </button>
 
+              <!-- Dinonaktifkan: pengguna hanya memakai file Excel sesuai template.
               <h3 class="data-subhead">Ekspor data saja</h3>
               <p class="data-copy">
                 Berisi sheet <strong>Data Penugasan</strong> (7 kolom) dan
@@ -157,6 +158,7 @@
                 <button type="button" class="btn btn-secondary" id="btn-pulihkan">Pulihkan Backup</button>
                 <input type="file" id="file-backup" accept=".json,application/json" hidden>
               </div>
+              -->
 
               <div class="data-danger">
                 <div>
@@ -180,7 +182,7 @@
             </svg>
             <span>
               Data hanya ada di browser ini. Jika data situs dibersihkan, data akan hilang.
-              Ekspor Excel atau backup JSON secara berkala.
+              Ekspor Excel secara berkala.
             </span>
           </p>
         </section>

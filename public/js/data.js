@@ -233,7 +233,7 @@ async function terapkanImpor() {
       <strong>${formatAngka(ringkasan.jumlahPetugas)} petugas</strong>, dan
       <strong>${formatAngka(ringkasan.jumlahJenis)} jenis kegiatan</strong> dari
       <strong>${escapeHtml(state.fileNama)}</strong>.</p>
-      <p style="margin:0">Backup data lama dibuat otomatis dan bisa dipulihkan dari bagian Pemulihan.</p>`,
+      <p style="margin:0">Data lama dicadangkan otomatis di browser ini sebelum ditimpa.</p>`,
     teksTombol: 'Ya, timpa data',
   });
   if (!lanjut) return;
@@ -430,7 +430,7 @@ async function kosongkan() {
       penugasan, <strong>${formatAngka(data.petugas.length)} petugas</strong>, dan
       <strong>${formatAngka(data.jenis.length)} jenis kegiatan</strong> akan dihapus dari
       browser ini.</p>
-      <p style="margin:0">Backup otomatis dibuat, tetapi sebaiknya unduh file Excel atau backup JSON
+      <p style="margin:0">Data lama dicadangkan otomatis, tetapi sebaiknya unduh file Excel
       terlebih dahulu.</p>`,
     teksTombol: 'Ya, kosongkan',
   });
@@ -448,7 +448,7 @@ async function kosongkan() {
 await initLayout({
   active: 'data',
   judul: 'Data & Excel',
-  deskripsi: 'Impor, ekspor, dan cadangkan data penugasan yang tersimpan di browser.',
+  deskripsi: 'Impor dan ekspor data penugasan yang tersimpan di browser.',
 });
 
 const dropzone = el('dropzone');
@@ -488,15 +488,18 @@ dropzone.addEventListener('drop', (event) => {
 
 el('batal-impor').addEventListener('click', resetPratinjau);
 el('terapkan-impor').addEventListener('click', terapkanImpor);
-el('btn-ekspor').addEventListener('click', ekspor);
+// Dinonaktifkan: tombol "Ekspor data saja" dan "Cadangan & pemulihan" disembunyikan
+// dari halaman Data & Excel (lihat data.html). Pengguna hanya memakai ekspor Excel
+// sesuai template. Fungsinya masih ada di bawah bila ingin diaktifkan kembali.
+// el('btn-ekspor').addEventListener('click', ekspor);
 el('btn-ekspor-template').addEventListener('click', eksporDenganTemplate);
 el('btn-template-kosong').addEventListener('click', unduhTemplate);
-el('btn-backup').addEventListener('click', unduhBackup);
-el('btn-pulihkan').addEventListener('click', () => el('file-backup').click());
-el('file-backup').addEventListener('change', () => {
-  const file = el('file-backup').files?.[0];
-  if (file) pulihkanBackup(file);
-});
+// el('btn-backup').addEventListener('click', unduhBackup);
+// el('btn-pulihkan').addEventListener('click', () => el('file-backup').click());
+// el('file-backup').addEventListener('change', () => {
+//   const file = el('file-backup').files?.[0];
+//   if (file) pulihkanBackup(file);
+// });
 el('btn-reset').addEventListener('click', kosongkan);
 
 window.addEventListener('data-berubah', perbaruiStatistik);

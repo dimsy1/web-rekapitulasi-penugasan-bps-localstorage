@@ -917,7 +917,7 @@ function isiDataPenugasan(workbook, dataset, struktur) {
   const kapasitas = struktur.dataAkhir - struktur.dataAwal + 1;
   if (baris.length > kapasitas) {
     throw new Error(
-      `Sheet Data Penugasan pada template hanya menampung ${kapasitas} baris, sedangkan data saat ini ${baris.length} baris. Gunakan "Unduh Data Saja" atau pisahkan data per tahun.`
+      `Sheet Data Penugasan pada template hanya menampung ${kapasitas} baris, sedangkan data saat ini ${baris.length} baris. Pisahkan data per tahun atau gunakan template dengan kapasitas lebih besar.`
     );
   }
 

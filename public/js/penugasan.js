@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { initLayout, toast, konfirmasiHapus, setTahunGlobal } from './layout.js';
+import { initLayout, toast, konfirmasiHapus, setTahunGlobal, labelTahunAktif } from './layout.js';
 import { angkaDariInput, escapeHtml, formatAngka, formatInputHonor, formatRupiah, unduhCSV } from './format.js';
 import { DAFTAR_BULAN, namaBulan } from './bulan.js';
 
@@ -559,7 +559,7 @@ async function muat() {
       !status && belum > 0
         ? `${state.rows.length} baris · ${belum} belum lengkap`
         : `${state.rows.length} baris`;
-    el('badge-tahun').textContent = `Tahun ${state.tahun}`;
+    el('badge-tahun').textContent = `Tahun ${labelTahunAktif(state.tahun)}`;
     renderTabel();
   } catch (kesalahan) {
     state.rows = [];
@@ -719,7 +719,7 @@ function ekspor() {
 const app = await initLayout({
   active: 'penugasan',
   judul: 'Daftar Penugasan',
-  deskripsi: 'Menambah, mengubah, dan menghapus data penugasan.',
+  deskripsi: 'Catat penugasan dan honor petugas.',
 });
 
 state.tahun = app.tahun;

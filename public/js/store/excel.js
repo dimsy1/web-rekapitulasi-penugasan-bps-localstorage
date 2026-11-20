@@ -609,16 +609,7 @@ export async function imporFileExcel(file) {
       `${petugasRekap.hanyaJenis.length} nama hanya ada di kolom A sheet Rekap Jenis Kegiatan: ${petugasRekap.hanyaJenis.slice(0, 3).join(', ')}${petugasRekap.hanyaJenis.length > 3 ? ', …' : ''}.`
     );
   }
-  if (data.petugas.length > kapasitas) {
-    peringatan.push(
-      `Semua ${data.petugas.length} nama petugas dapat diimpor. Untuk mengekspor semuanya, rentang rekap pada template perlu diperluas dari ${kapasitas} baris.`
-    );
-  }
-  if (data.penugasan.length > kapasitasPenugasan) {
-    peringatan.push(
-      `Semua ${data.penugasan.length} penugasan yang valid dapat diimpor. Untuk mengekspor semuanya, rentang Data Penugasan pada template perlu diperluas dari ${kapasitasPenugasan} baris.`
-    );
-  }
+
   if (jenisRekap.length > 0 && referensi.length > 0) {
     const kunciReferensi = new Set(referensi.map((nama) => nama.toLowerCase()));
     const beda = jenisRekap.filter((nama) => !kunciReferensi.has(nama.toLowerCase()));
@@ -652,11 +643,7 @@ export async function imporFileExcel(file) {
       );
     }
   }
-  if (struktur.kolomJenisMaks > 0 && data.jenis.length > struktur.kolomJenisMaks) {
-    peringatan.push(
-      `Semua ${data.jenis.length} jenis kegiatan dapat diimpor. Untuk mengekspor semuanya, rentang Rekap Jenis Kegiatan pada template perlu diperluas dari ${struktur.kolomJenisMaks} kolom jenis.`
-    );
-  }
+
   if (tahunAnalisis === null) {
     peringatan.push('Sel B3 (tahun analisis) di sheet Rekap Honor Bulanan belum berisi tahun yang sah.');
   }

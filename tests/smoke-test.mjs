@@ -393,8 +393,8 @@ async function uji() {
   assert.equal(hasilBesar.ringkasan.kapasitasPenugasan, 300);
   assert.equal(hasilBesar.data.penugasan.length, 301);
   assert.equal(hasilBesar.errors.length, 0);
-  assert.ok(hasilBesar.peringatan.some((pesan) => pesan.includes('Semua 86 nama petugas')));
-  assert.ok(hasilBesar.peringatan.some((pesan) => pesan.includes('Semua 301 penugasan')));
+  assert.ok(!hasilBesar.peringatan.some((pesan) => pesan.includes('rentang rekap')));
+  assert.ok(!hasilBesar.peringatan.some((pesan) => pesan.includes('rentang Data Penugasan')));
   simpanDataset(hasilBesar.data);
   assert.equal(bacaDataset().petugas.length, 86);
   assert.equal(bacaDataset().penugasan.length, 301);
@@ -495,7 +495,7 @@ async function uji() {
   assert.deepEqual(hasilJenisPanjang.data.jenis.map(({ nama }) => nama), daftarJenisPanjang);
   assert.equal(hasilJenisPanjang.ringkasan.jumlahJenis, 20);
   assert.ok(hasilJenisPanjang.ringkasan.kapasitasJenis < 20);
-  assert.ok(hasilJenisPanjang.peringatan.some((pesan) => pesan.includes('Semua 20 jenis kegiatan')));
+  assert.ok(!hasilJenisPanjang.peringatan.some((pesan) => pesan.includes('rentang Rekap Jenis Kegiatan')));
   simpanDataset(hasilJenisPanjang.data);
   assert.equal(bacaDataset().jenis.length, 20);
 

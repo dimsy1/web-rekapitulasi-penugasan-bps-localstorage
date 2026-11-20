@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { escapeHtml } from './format.js';
 import { keluar, periksaSesi } from './sesi.js';
-import { pantauPerubahanLintasTab } from './store/penyimpanan.js';
+import { bacaDataset, pantauPerubahanLintasTab } from './store/penyimpanan.js';
 
 const IKON = {
   dashboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>`,
@@ -81,8 +81,11 @@ function renderSidebar(aktif) {
     </div>`;
 }
 
-function opsiTahun(meta, tahun) {
-  const set = new Set((meta?.tahun_tersedia || []).map((nilai) => Number(nilai)));
+function opsiTahun(tahun) {
+  const data = bacaDataset();
+  const set = new Set(data.penugasan.map((baris) => baris.tahun));
+  if (data.tahunAnalisis) set.add(data.tahunAnalisis);
+  if (set.size === 0) return [];
   set.add(Number(tahun));
   set.add(new Date().getFullYear());
   return [...set]
@@ -90,13 +93,9 @@ function opsiTahun(meta, tahun) {
     .sort((a, b) => b - a);
 }
 
-function renderTopbar({ judul, deskripsi, tahun, daftarTahun }) {
+function renderTopbar({ judul, deskripsi }) {
   const topbar = document.getElementById('topbar');
   if (!topbar) return;
-
-  const opsi = daftarTahun
-    .map((nilai) => `<option value="${nilai}" ${nilai === tahun ? 'selected' : ''}>${nilai}</option>`)
-    .join('');
 
   topbar.innerHTML = `
     <button type="button" class="icon-button menu-toggle" id="menu-toggle" aria-label="Buka menu" aria-expanded="false">
@@ -113,15 +112,28 @@ function renderTopbar({ judul, deskripsi, tahun, daftarTahun }) {
       </span>
       <label class="year-picker" for="pilih-tahun">
         <span>Tahun</span>
-        <select id="pilih-tahun" aria-label="Pilih tahun aktif">${opsi}</select>
+        <select id="pilih-tahun" aria-label="Pilih tahun aktif"></select>
       </label>
       <button type="button" class="btn btn-secondary" id="keluar">Keluar</button>
     </div>`;
 }
 
 function sinkronTahun(tahun) {
+  const daftar = opsiTahun(tahun);
+  const pilih = document.getElementById('pilih-tahun');
+  if (pilih) {
+    pilih.innerHTML = daftar.length
+      ? daftar.map((nilai) => `<option value="${nilai}">${nilai}</option>`).join('')
+      : '<option value="">-</option>';
+    pilih.disabled = daftar.length === 0;
+    if (daftar.length) pilih.value = String(tahun);
+  }
   const teks = document.getElementById('sidebar-tahun');
-  if (teks) teks.textContent = String(tahun);
+  if (teks) teks.textContent = daftar.length ? String(tahun) : '-';
+}
+
+export function labelTahunAktif(tahun) {
+  return document.getElementById('pilih-tahun')?.disabled ? '-' : String(tahun);
 }
 
 function pasangMenuMobile() {
@@ -159,17 +171,6 @@ export function setTahunGlobal(tahun) {
   simpanTahun(angka);
   sinkronTahun(angka);
 
-  const pilih = document.getElementById('pilih-tahun');
-  if (pilih) {
-    if (![...pilih.options].some((opsi) => Number(opsi.value) === angka)) {
-      const opsi = document.createElement('option');
-      opsi.value = String(angka);
-      opsi.textContent = String(angka);
-      pilih.prepend(opsi);
-    }
-    pilih.value = String(angka);
-  }
-
   document.dispatchEvent(new CustomEvent('tahun-berubah', { detail: { tahun: angka } }));
 }
 
@@ -191,20 +192,18 @@ export async function initLayout({ active, judul, deskripsi }) {
     error = kesalahan;
   }
 
-  renderTopbar({
-    judul,
-    deskripsi,
-    tahun,
-    daftarTahun: opsiTahun(meta, tahun),
-  });
+  renderTopbar({ judul, deskripsi });
   sinkronTahun(tahun);
   pasangMenuMobile();
   document.getElementById('keluar')?.addEventListener('click', keluar);
   document.body.hidden = false;
 
+  window.addEventListener('data-berubah', () => sinkronTahun(bacaTahunAktif()));
   pantauPerubahanLintasTab(() => {
+    const tahunAktif = bacaTahunAktif();
+    sinkronTahun(tahunAktif);
     document.dispatchEvent(
-      new CustomEvent('tahun-berubah', { detail: { tahun: bacaTahunAktif() } })
+      new CustomEvent('tahun-berubah', { detail: { tahun: tahunAktif } })
     );
     toast('Data diperbarui dari tab lain.', 'info');
   });

@@ -223,7 +223,7 @@ async function hapus(row) {
 const app = await initLayout({
   active: 'master-petugas',
   judul: 'Daftar Petugas',
-  deskripsi: 'Kelola nama petugas yang menjadi baris pada rekap dan file Excel.',
+  deskripsi: 'Tambah dan ubah data petugas.',
 });
 
 state.tahun = app.tahun;

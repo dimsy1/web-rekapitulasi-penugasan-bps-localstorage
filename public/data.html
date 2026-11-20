@@ -17,13 +17,8 @@
         <section class="page-section">
           <div class="card data-intro">
             <div>
-              <span class="eyebrow">Sumber data</span>
-              <h2>Data tersimpan di browser ini</h2>
-              <p>
-                Aplikasi ini berjalan tanpa server. Data disimpan di <strong>localStorage</strong>
-                browser, lalu bisa diimpor dari file Excel dan diekspor kembali ke Excel.
-                Data tidak otomatis tersinkron antar perangkat.
-              </p>
+              <h2>Ringkasan Data</h2>
+              <p>Data tersimpan di browser ini. Gunakan fitur impor untuk memasukkan data dari file Excel, dan ekspor untuk mengunduhnya kembali.</p>
             </div>
             <div class="data-stats" id="data-stats">
               <div class="stat-card">
@@ -42,14 +37,6 @@
                 <span class="stat-label">Total honor</span>
                 <strong class="stat-value" id="stat-honor">Rp 0</strong>
               </div>
-              <div class="stat-card">
-                <span class="stat-label">Tahun data</span>
-                <strong class="stat-value" id="stat-tahun">—</strong>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">Terakhir diubah</span>
-                <strong class="stat-value stat-value-small" id="stat-diperbarui">—</strong>
-              </div>
             </div>
           </div>
 
@@ -58,7 +45,7 @@
               <div class="data-card-head">
                 <div>
                   <h3>Impor dari Excel</h3>
-                  <p>Membaca sheet <code>Data Penugasan</code>, <code>Referensi</code>, dan kolom A kedua sheet rekap.</p>
+                  <p>Pilih file Excel yang berisi data penugasan, lalu klik <strong>Impor Data</strong>.</p>
                 </div>
                 <span class="badge badge-muted">.xlsx</span>
               </div>
@@ -90,12 +77,10 @@
                 </div>
                 <div class="import-actions">
                   <button type="button" class="btn btn-secondary" id="batal-impor">Batal</button>
-                  <button type="button" class="btn btn-primary" id="terapkan-impor">Gabungkan Data</button>
+                  <button type="button" class="btn btn-primary" id="terapkan-impor">Impor Data</button>
                 </div>
                 <p class="import-warning">
-                   Data baru digabungkan dengan data yang sudah tersimpan. Petugas dan jenis dengan nama yang sama
-                   dipakai bersama. Setiap baris penugasan ditambahkan, termasuk jika file yang sama diimpor ulang.
-                   File template terakhir yang datanya diterapkan menjadi cetakan ekspor.
+                  Data dari file akan ditambahkan ke data yang sudah ada.
                 </p>
               </div>
             </section>
@@ -103,36 +88,24 @@
             <section class="card data-card">
               <div class="data-card-head">
                 <div>
-                  <h3>Ekspor ke Excel</h3>
-                  <p>Mengunduh seluruh data aktif sebagai file .xlsx.</p>
+                  <h3>Unduh ke Excel</h3>
+                  <p>Unduh seluruh data sebagai file Excel.</p>
                 </div>
               </div>
 
-              <p class="data-copy">
-                <strong>Sesuai template</strong> menghasilkan file dengan 5 sheet seperti
-                <code>Template_Matriks_Penugasan_dan_Honor_Petugas.xlsx</code>: Dashboard,
-                Data Penugasan, Referensi, Rekap Honor Bulanan, dan Rekap Jenis Kegiatan.
-                Formula rekap tetap hidup, tahun analisis dan nama petugas terisi otomatis.
-              </p>
-              <p class="data-copy" id="template-aktif">Cetakan: template bawaan aplikasi.</p>
+              <p class="data-copy" id="template-aktif"></p>
 
               <button type="button" class="btn btn-primary btn-block" id="btn-ekspor-template">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M12 3v11"></path><path d="m8 10 4 4 4-4"></path><path d="M4 17v2.5h16V17"></path>
                 </svg>
-                Unduh Sesuai Template Excel
+                Unduh
               </button>
-              <p class="data-meta">
-                Batas baris dan kolom mengikuti file template yang dipakai.
-                Bila data melebihi batas, kurangi jumlah baris atau petugas sebelum mengekspor.
-              </p>
 
-              <h3 class="data-subhead">Template untuk diisi di Excel</h3>
+              <h3 class="data-subhead">Template kosong</h3>
               <p class="data-copy">
-                Unduh template kosong yang kapasitasnya sudah diperbesar, isi nama petugas pada
-                kolom A sheet <strong>Rekap Honor Bulanan</strong> dan
-                <strong>Rekap Jenis Kegiatan</strong>, lalu impor kembali ke sini.
+                Unduh template kosong, isi nama petugas di Excel, lalu impor kembali ke sini.
               </p>
               <button type="button" class="btn btn-secondary btn-block" id="btn-template-kosong">
                 Unduh Template Kosong
@@ -163,15 +136,10 @@
               <div class="data-danger">
                 <div>
                   <strong>Kosongkan semua data</strong>
-                  <p>Data aktif akan dihapus. Backup otomatis tetap disimpan di browser.</p>
+                  <p>Semua data di aplikasi ini akan dihapus.</p>
                 </div>
                 <button type="button" class="btn btn-danger" id="btn-reset">Kosongkan</button>
               </div>
-
-              <p class="data-meta">
-                Penyimpanan terpakai: <span id="status-ukuran">—</span>.
-                Jangan gunakan mode Incognito untuk menyimpan data jangka panjang.
-              </p>
             </section>
           </div>
 
@@ -181,8 +149,7 @@
               <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5h.01"></path>
             </svg>
             <span>
-              Data hanya ada di browser ini. Jika data situs dibersihkan, data akan hilang.
-              Ekspor Excel secara berkala.
+              Data hanya tersimpan di perangkat dan browser ini. Unduh file Excel secara berkala agar data tidak hilang.
             </span>
           </p>
         </section>

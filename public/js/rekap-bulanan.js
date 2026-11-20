@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { initLayout, toast } from './layout.js';
+import { initLayout, toast, labelTahunAktif } from './layout.js';
 import { escapeHtml, formatAngka, formatRupiah, formatSel, unduhCSV } from './format.js';
 
 const el = (id) => document.getElementById(id);
@@ -68,8 +68,9 @@ function render(data) {
   el('ringkasan-rekap').textContent =
     `Total honor ${formatRupiah(data.total_keseluruhan)} • ` +
     `${formatAngka(data.total_penugasan)} penugasan • ${data.baris.length} petugas`;
-  el('foot-tahun').textContent = `Sumber: data penugasan tahun ${data.tahun}`;
-  el('print-tahun').textContent = String(data.tahun);
+  const label = labelTahunAktif(data.tahun);
+  el('foot-tahun').textContent = label === '-' ? 'Belum ada data penugasan.' : `Sumber: data penugasan tahun ${label}`;
+  el('print-tahun').textContent = label;
 
   el('rekap-card').hidden = false;
   el('rekap-empty').hidden = true;
@@ -80,8 +81,8 @@ async function muat(tahun) {
   el('rekap-loading').hidden = false;
   el('rekap-card').hidden = true;
   el('rekap-empty').hidden = true;
-  el('ringkasan-rekap').textContent = `Memuat data tahun ${state.tahun}…`;
-  el('print-tahun').textContent = String(state.tahun);
+  el('ringkasan-rekap').textContent = 'Memuat data…';
+  el('print-tahun').textContent = labelTahunAktif(state.tahun);
 
   try {
     const data = await api.getRekapBulanan(state.tahun);
@@ -90,7 +91,10 @@ async function muat(tahun) {
 
     if (!data.baris || data.baris.length === 0) {
       state.data = data;
-      el('ringkasan-rekap').textContent = `Belum ada data penugasan pada tahun ${state.tahun}.`;
+      const label = labelTahunAktif(state.tahun);
+      el('ringkasan-rekap').textContent = label === '-'
+        ? 'Belum ada data penugasan.'
+        : `Belum ada data penugasan pada tahun ${label}.`;
       tampilkanKosong(
         'Belum ada data untuk tahun ini',
         'Tambahkan penugasan pada halaman Daftar Penugasan, lalu pilih tahun yang sesuai.'
@@ -150,7 +154,7 @@ function cetak() {
 const app = await initLayout({
   active: 'rekap-bulanan',
   judul: 'Rekap per Bulan',
-  deskripsi: 'Matriks honor petugas per bulan, total setahun, dan jumlah penugasan.',
+  deskripsi: 'Honor petugas per bulan.',
 });
 
 state.tahun = app.tahun;

@@ -214,7 +214,7 @@ async function hapus(row) {
 const app = await initLayout({
   active: 'master-jenis',
   judul: 'Daftar Jenis Kegiatan',
-  deskripsi: 'Kelola jenis kegiatan yang membentuk kolom pada rekap.',
+  deskripsi: 'Tambah dan ubah jenis kegiatan.',
 });
 
 state.tahun = app.tahun;

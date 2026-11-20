@@ -8,7 +8,6 @@ import {
   simpanBackup,
   normalisasiDataset,
   kosongkanData,
-  ukuranData,
   simpanTemplate,
   bacaTemplate,
 } from './store/penyimpanan.js';
@@ -27,13 +26,6 @@ const state = {
   sibuk: false,
 };
 
-function formatTanggal(iso) {
-  if (!iso) return 'Belum ada data';
-  const tanggal = new Date(iso);
-  if (Number.isNaN(tanggal.getTime())) return '—';
-  return tanggal.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
 function perbaruiStatistik() {
   const data = bacaDataset();
   const ringkasan = ringkasanDataset(data);
@@ -42,23 +34,13 @@ function perbaruiStatistik() {
   el('stat-petugas').textContent = formatAngka(ringkasan.jumlahPetugas);
   el('stat-jenis').textContent = formatAngka(ringkasan.jumlahJenis);
   el('stat-honor').textContent = formatRupiah(ringkasan.totalHonor);
-  el('stat-tahun').textContent = ringkasan.tahun.length
-    ? ringkasan.tahun.join(', ')
-    : '—';
-  el('stat-diperbarui').textContent = formatTanggal(data.diperbarui);
-
-  const ukuran = ukuranData();
-  el('status-ukuran').textContent =
-    ukuran < 1024 ? `${ukuran} B` : `${(ukuran / 1024).toFixed(1)} KB`;
 
   const template = bacaTemplate();
   const infoTemplate = el('template-aktif');
   if (infoTemplate) {
     infoTemplate.textContent = template
-      ? `Cetakan: ${template.nama} (diimpor ${
-          template.disimpan ? formatTanggal(template.disimpan) : 'sebelumnya'
-        }).`
-      : 'Cetakan: template bawaan aplikasi (100 baris petugas, 300 baris penugasan).';
+      ? `Template: ${template.nama}`
+      : '';
   }
 }
 
@@ -92,7 +74,7 @@ function renderPratinjau(hasil) {
   el('import-summary').innerHTML = `
     <div class="import-summary-head">
       <div>
-        <strong>${formatAngka(hasil.sumber.length)} dari ${formatAngka(hasil.jumlahFile)} file siap digabungkan</strong>
+        <strong>${formatAngka(hasil.sumber.length)} dari ${formatAngka(hasil.jumlahFile)} file siap diimpor</strong>
         ${hasil.sumber.map(({ nama, ringkasan: info }) => `<span>${escapeHtml(nama)} · ${formatAngka(info.jumlahBaris)} baris${
           info.tahunAnalisis ? ` · Tahun B3 ${info.tahunAnalisis}` : ''
         }</span>`).join('')}
@@ -173,21 +155,7 @@ async function pilihFile(daftarFile) {
 
     const dataImpor = hasil.sumber.map(({ data }) => data);
     hasil.ringkasan = ringkasanDataset(gabungkanDataset(datasetKosong(), dataImpor));
-    if (hasil.template) {
-      const gabungan = gabungkanDataset(bacaDataset(), dataImpor);
-      const { kapasitasPetugas, kapasitasPenugasan, kapasitasJenis } = hasil.template.ringkasan;
-      if (
-        gabungan.petugas.length > kapasitasPetugas ||
-        gabungan.penugasan.length > kapasitasPenugasan ||
-        gabungan.jenis.length > kapasitasJenis
-      ) {
-        hasil.peringatan.push(
-          `Data gabungan melebihi kapasitas ekspor ${hasil.template.file.nama} ` +
-          `(${formatAngka(kapasitasPetugas)} petugas, ${formatAngka(kapasitasPenugasan)} penugasan, ` +
-          `${formatAngka(kapasitasJenis)} jenis). Perluas rentang template untuk mengekspor semuanya.`
-        );
-      }
-    }
+
     state.hasil = hasil;
     renderPratinjau(hasil);
   } catch (kesalahan) {
@@ -204,6 +172,8 @@ async function terapkanImpor() {
   try {
     const lama = bacaDataset();
     const gabungan = gabungkanDataset(lama, hasil.sumber.map(({ data }) => data));
+    const tahunAnalisis = hasil.sumber.map(({ ringkasan }) => ringkasan.tahunAnalisis).reverse().find(Boolean);
+    if (tahunAnalisis) gabungan.tahunAnalisis = tahunAnalisis;
     const backupBerhasil = simpanBackup(lama);
     simpanDataset(gabungan);
 
@@ -222,8 +192,6 @@ async function terapkanImpor() {
 
     const tahunAktif = bacaTahunAktif();
     const tahunGabungan = ringkasanDataset(gabungan).tahun;
-    const fileTerakhir = hasil.sumber[hasil.sumber.length - 1];
-    const tahunAnalisis = fileTerakhir.ringkasan.tahunAnalisis;
     const tahunImpor = tahunGabungan.includes(tahunAnalisis)
       ? tahunAnalisis
       : hasil.ringkasan.tahun[0] ?? tahunGabungan[0] ?? tahunAnalisis;
@@ -388,7 +356,7 @@ async function pulihkanBackup(file) {
 async function kosongkan() {
   const data = bacaDataset();
   const jumlah = data.penugasan.length;
-  if (jumlah === 0 && data.petugas.length === 0) {
+  if (jumlah === 0 && data.petugas.length === 0 && data.jenis.length === 0) {
     toast('Data sudah kosong.', 'info');
     return;
   }
@@ -417,7 +385,7 @@ async function kosongkan() {
 await initLayout({
   active: 'data',
   judul: 'Data & Excel',
-  deskripsi: 'Impor dan ekspor data penugasan yang tersimpan di browser.',
+  deskripsi: 'Impor dan unduh data Excel.',
 });
 
 const dropzone = el('dropzone');

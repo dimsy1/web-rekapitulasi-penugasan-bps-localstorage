@@ -47,6 +47,9 @@ export function normalisasiDataset(mentah) {
   const data = mentah && typeof mentah === 'object' ? mentah : {};
   const hasil = datasetKosong();
   hasil.diperbarui = typeof data.diperbarui === 'string' ? data.diperbarui : null;
+  if (Number.isInteger(data.tahunAnalisis) && data.tahunAnalisis >= 2020) {
+    hasil.tahunAnalisis = data.tahunAnalisis;
+  }
 
   const jenisTerpakai = new Set();
   for (const baris of Array.isArray(data.jenis) ? data.jenis : []) {

@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { initLayout, toast } from './layout.js';
+import { initLayout, toast, labelTahunAktif } from './layout.js';
 import { formatAngka, formatRingkas, formatRupiah } from './format.js';
 import { DAFTAR_BULAN } from './bulan.js';
 
@@ -215,12 +215,13 @@ function perbaruiChartJenis(perJenis) {
 }
 
 function aturKpiTahun(tahun) {
-  el('badge-tahun-bulanan').textContent = `Tahun ${tahun}`;
-  el('badge-tahun-jenis').textContent = `Tahun ${tahun}`;
-  el('catatan-tahun').textContent = String(tahun);
-  el('kpi-honor-meta').textContent = `Tahun anggaran ${tahun}`;
-  el('kpi-penugasan-meta').textContent = `Baris transaksi tahun ${tahun}`;
-  el('kpi-petugas-meta').textContent = `Petugas dengan penugasan tahun ${tahun}`;
+  const label = labelTahunAktif(tahun);
+  el('badge-tahun-bulanan').textContent = `Tahun ${label}`;
+  el('badge-tahun-jenis').textContent = `Tahun ${label}`;
+  el('catatan-tahun').textContent = label;
+  el('kpi-honor-meta').textContent = `Tahun anggaran ${label}`;
+  el('kpi-penugasan-meta').textContent = label === '-' ? 'Belum ada penugasan' : `Baris transaksi tahun ${label}`;
+  el('kpi-petugas-meta').textContent = label === '-' ? 'Belum ada petugas dengan penugasan' : `Petugas dengan penugasan tahun ${label}`;
 }
 
 async function muat(tahun) {
@@ -253,7 +254,7 @@ async function muat(tahun) {
 const app = await initLayout({
   active: 'dashboard',
   judul: 'Dashboard',
-  deskripsi: 'Ringkasan honor dan penugasan petugas pada tahun aktif.',
+  deskripsi: 'Ringkasan total honor dan penugasan.',
 });
 
 tahunAktif = app.tahun;

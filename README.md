@@ -17,13 +17,11 @@ Excel. Cocok di-hosting gratis sebagai situs statis (Vercel, Netlify, GitHub Pag
 4. **Rekap per Jenis Kegiatan** — matriks petugas × jenis kegiatan.
 5. **Daftar Petugas** — kelola nama petugas (tambah, ubah, hapus). Urutan baris
    mengikuti file Excel yang diimpor, dan petugas baru otomatis masuk di akhir.
-6. **Daftar Jenis Kegiatan** — kelola jenis kegiatan. Saat aplikasi pertama kali
-   dipakai, daftar ini sudah berisi **10 jenis bawaan** dari sheet `Referensi`
-   template Excel: Survei, Sensus, Pengolahan Data, Pembinaan Statistik Sektoral,
-   Koordinasi, Administrasi, Pengawasan/Monitoring, Pengolahan dan Analisis,
-   Diseminasi, dan Lainnya.
-7. **Data & Excel** — impor Excel, ekspor Excel, unduh template kosong,
-   backup/pemulihan JSON, reset data.
+6. **Daftar Jenis Kegiatan** — kelola jenis kegiatan. Daftar ini **kosong** pada
+   pemakaian pertama dan terisi dari file Excel yang diimpor (sheet `Referensi`,
+   atau judul kolom sheet `Rekap Jenis Kegiatan` bila Referensi kosong). Jenis juga
+   bisa ditambah/diubah manual di halaman ini.
+7. **Data & Excel** — impor Excel, ekspor Excel, unduh template kosong, reset data.
 
 Rekap tidak pernah disimpan. Semua angka dihitung ulang dari daftar penugasan
 setiap kali halaman dimuat. Semua petugas master ikut ditampilkan, termasuk yang
@@ -45,9 +43,10 @@ memakai ES module dan path absolut (`/css`, `/js`), jadi sajikan dari akar situs
 
 Ada dua cara memulai:
 
-**Mulai dari nol (data diisi lewat web)** — daftar jenis kegiatan sudah berisi
-10 jenis bawaan, jadi langsung bisa menambah penugasan di halaman
-**Daftar Penugasan**. Petugas baru otomatis dibuat saat namanya diketik.
+**Mulai dari nol (data diisi lewat web)** — daftar jenis kegiatan masih kosong.
+Tambahkan jenis lebih dulu di halaman **Daftar Jenis Kegiatan** (atau impor file
+Excel), lalu isi penugasan di halaman **Daftar Penugasan**. Petugas baru otomatis
+dibuat saat namanya diketik.
 
 **Mulai dari file Excel yang sudah ada**
 
@@ -78,10 +77,9 @@ terapkan. Daftar jenis bisa langsung diedit/ditambah di halaman **Daftar Jenis
 Kegiatan**.
 
 Catatan: **Kosongkan** menghapus penugasan, petugas, dan jenis kegiatan sekaligus.
-Jenis bawaan hanya muncul otomatis saat aplikasi belum pernah menyimpan data,
-jadi setelah dikosongkan jenis perlu ditambahkan lagi secara manual. File template
-yang pernah diimpor tetap dipakai sebagai cetakan ekspor sampai Anda mengimpor
-file lain.
+Daftar jenis tidak pernah diisi otomatis, jadi setelah dikosongkan jenis perlu
+diimpor ulang atau ditambahkan manual. File template yang pernah diimpor tetap
+dipakai sebagai cetakan ekspor sampai Anda mengimpor file lain.
 
 ### Format Excel yang dibaca
 

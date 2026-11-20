@@ -57,7 +57,7 @@ function render() {
   if (tampil.length === 0) {
     const pesan =
       state.data.length === 0
-        ? 'Belum ada jenis kegiatan.'
+        ? 'Belum ada jenis kegiatan. Impor file Excel di halaman Data & Excel, atau tambahkan jenis di sini.'
         : 'Tidak ada jenis kegiatan yang cocok dengan pencarian.';
     tbody.innerHTML = `<tr><td colspan="3"><div class="dt-empty">${pesan}</div></td></tr>`;
     return;

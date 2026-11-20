@@ -232,6 +232,10 @@ function isiSelectJenis(idTerpilih = null, cadangan = '') {
     select.appendChild(opsi);
   }
   select.value = idTerpilih ? String(idTerpilih) : '';
+
+  // Bila belum ada jenis (misalnya belum pernah impor Excel), tampilkan petunjuk.
+  const hint = el('hint-jenis');
+  if (hint) hint.hidden = daftar.length > 0;
 }
 
 function isiComboboxPetugas(idTerpilih = null, cadangan = '') {

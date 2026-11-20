@@ -140,8 +140,10 @@ function bukaModal(row = null) {
   el('simpan-petugas').textContent = row ? 'Simpan Perubahan' : 'Simpan';
 
   el('f-nama-petugas').value = row?.nama || '';
-  el('f-urutan-petugas').value =
-    row && row.urutan !== undefined && row.urutan !== null ? String(row.urutan) : '';
+  // Urutan tidak lagi diisi manual: mengikuti file Excel yang diimpor, dan
+  // petugas baru otomatis diletakkan di akhir oleh api.buatPetugas().
+  // el('f-urutan-petugas').value =
+  //   row && row.urutan !== undefined && row.urutan !== null ? String(row.urutan) : '';
 
   modal.showModal();
   document.body.classList.add('modal-terbuka');
@@ -159,7 +161,6 @@ function validasi() {
   bersihkanError();
   let valid = true;
   const nama = el('f-nama-petugas').value.trim();
-  const urutanTeks = el('f-urutan-petugas').value.trim();
 
   if (!nama) {
     errorField('nama', 'Nama petugas wajib diisi.');
@@ -169,19 +170,10 @@ function validasi() {
     valid = false;
   }
 
-  let urutan = '';
-  if (urutanTeks) {
-    const angka = Number(urutanTeks);
-    if (!Number.isInteger(angka) || angka < 0 || angka > 65535) {
-      errorField('urutan', 'Urutan harus bilangan bulat antara 0 dan 65535.');
-      valid = false;
-    } else {
-      urutan = angka;
-    }
-  }
-
+  // Urutan tidak dikirim: api memakai urutan terakhir + 1 untuk petugas baru,
+  // dan mempertahankan urutan lama saat mengubah nama.
   if (!valid) return null;
-  return urutan === '' ? { nama } : { nama, urutan };
+  return { nama };
 }
 
 async function simpan(event) {

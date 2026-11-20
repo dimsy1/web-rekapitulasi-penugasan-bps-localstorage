@@ -30,7 +30,7 @@
             <div class="table-card-head">
               <div>
                 <h3>Petugas <span class="badge" id="jumlah-petugas">0 petugas</span></h3>
-                <p>Urutan di sini menentukan urutan baris pada rekap dan file Excel.</p>
+                <p>Urutan baris mengikuti file Excel yang diimpor; petugas baru ditambahkan di akhir.</p>
               </div>
               <button type="button" class="btn btn-primary" id="btn-tambah-petugas">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -90,14 +90,18 @@
           <div class="field full" data-field="nama">
             <label for="f-nama-petugas">Nama Petugas <span class="wajib">*</span></label>
             <input type="text" id="f-nama-petugas" maxlength="150" autocomplete="off" placeholder="Contoh: Ahmad Fauzi">
+            <p class="field-hint">Petugas baru diletakkan di urutan terakhir, mengikuti urutan file Excel yang diimpor.</p>
             <p class="field-error" data-error="nama"></p>
           </div>
+          <!-- Input urutan dinonaktifkan: urutan baris mengikuti file Excel yang diimpor,
+               petugas baru otomatis ditambahkan di akhir.
           <div class="field full" data-field="urutan">
             <label for="f-urutan-petugas">Urutan <span class="opsional">(opsional)</span></label>
             <input type="number" id="f-urutan-petugas" min="0" max="65535" step="1" autocomplete="off" placeholder="Kosongkan untuk meletakkan di akhir">
             <p class="field-hint">Menentukan posisi baris pada rekap dan saat ekspor ke Excel.</p>
             <p class="field-error" data-error="urutan"></p>
           </div>
+          -->
         </div>
       </div>
 

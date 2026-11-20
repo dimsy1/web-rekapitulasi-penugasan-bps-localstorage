@@ -15,8 +15,8 @@ Excel. Cocok di-hosting gratis sebagai situs statis (Vercel, Netlify, GitHub Pag
    diketik bebas dengan saran (autocomplete).
 3. **Rekap per Bulan** — matriks petugas × 12 bulan.
 4. **Rekap per Jenis Kegiatan** — matriks petugas × jenis kegiatan.
-5. **Daftar Petugas** — kelola nama petugas (tambah, ubah, hapus, atur urutan).
-   Urutan di sini sama dengan urutan baris pada rekap dan file Excel.
+5. **Daftar Petugas** — kelola nama petugas (tambah, ubah, hapus). Urutan baris
+   mengikuti file Excel yang diimpor, dan petugas baru otomatis masuk di akhir.
 6. **Daftar Jenis Kegiatan** — kelola jenis kegiatan. Saat aplikasi pertama kali
    dipakai, daftar ini sudah berisi **10 jenis bawaan** dari sheet `Referensi`
    template Excel: Survei, Sensus, Pengolahan Data, Pembinaan Statistik Sektoral,
@@ -160,7 +160,8 @@ sebagai cetakan (bila belum pernah impor, dipakai template bawaan
   hidup dan akan menghitung sendiri saat file dibuka di Excel.
 - Tahun analisis (sel `B3` rekap) diisi dari tahun aktif.
 - Nama petugas di kolom A kedua sheet rekap diisi **semua petugas** (termasuk yang
-  belum punya penugasan) mengikuti urutan pada halaman **Daftar Petugas**.
+  belum punya penugasan) mengikuti urutan file Excel yang diimpor; petugas baru
+  dari web diletakkan di akhir.
 - Header jenis kegiatan pada sheet **Rekap Jenis Kegiatan** disusun mengikuti
   daftar jenis di web.
 - Baris yang belum lengkap ditulis apa adanya: sel jenis/bulan/honor yang kosong

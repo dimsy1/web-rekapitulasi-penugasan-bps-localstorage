@@ -632,6 +632,10 @@ svg {
   table-layout: fixed;
 }
 
+#tabel-penugasan th.kolom-pekerjaan {
+  width: 220px;
+}
+
 #tabel-penugasan td {
   overflow: hidden;
 }
@@ -791,12 +795,10 @@ td.num {
 
 .pekerjaan-cell .nama {
   display: block;
-  overflow: hidden;
   color: var(--ink);
   font-size: 12.5px;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .pekerjaan-cell .kode {
@@ -1595,6 +1597,33 @@ body.modal-terbuka {
 
 [hidden] {
   display: none !important;
+}
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(100%, 400px);
+  padding: clamp(20px, 5vw, 32px);
+}
+
+.login-card h1 {
+  margin: 16px 0 20px;
+  font-size: 22px;
+}
+
+.login-form {
+  display: grid;
+  gap: 16px;
+}
+
+.login-error {
+  margin: 0;
+  color: #a02020;
 }
 
 .sr-only {

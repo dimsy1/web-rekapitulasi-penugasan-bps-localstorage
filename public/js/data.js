@@ -2,6 +2,8 @@ import { initLayout, toast, konfirmasiHapus, dialogPesan, setTahunGlobal, bacaTa
 import { escapeHtml, formatAngka, formatRupiah } from './format.js';
 import {
   bacaDataset,
+  datasetKosong,
+  gabungkanDataset,
   simpanDataset,
   simpanBackup,
   normalisasiDataset,
@@ -22,7 +24,6 @@ const el = (id) => document.getElementById(id);
 
 const state = {
   hasil: null,
-  fileNama: '',
   sibuk: false,
 };
 
@@ -61,16 +62,17 @@ function perbaruiStatistik() {
   }
 }
 
-function setSibuk(aktif) {
+function setSibuk(aktif, membaca = false) {
   state.sibuk = aktif;
-  el('impor-loading').hidden = !aktif;
+  el('impor-loading').hidden = !membaca;
+  el('batal-impor').disabled = aktif;
+  el('terapkan-impor').disabled = aktif || !state.hasil?.sumber.length;
   el('dropzone').classList.toggle('is-busy', aktif);
   el('dropzone').setAttribute('aria-busy', aktif ? 'true' : 'false');
 }
 
 function resetPratinjau() {
   state.hasil = null;
-  state.fileNama = '';
   el('import-preview').hidden = true;
   el('import-errors').hidden = true;
   el('import-warnings').hidden = true;
@@ -80,46 +82,26 @@ function resetPratinjau() {
   el('file-excel').value = '';
 }
 
-function renderPratinjau(hasil, namaFile) {
+function renderPratinjau(hasil) {
   const ringkasan = hasil.ringkasan;
   const valid = ringkasan.jumlahBaris;
   const dilewati = hasil.errors.length;
   const tahun = ringkasan.tahun.length ? ringkasan.tahun.join(', ') : '—';
-  const petugasRekap = Number(ringkasan.jumlahPetugasRekap) || 0;
-  const kapasitas = Number(ringkasan.kapasitasPetugas) || 0;
-  const kapasitasJenis = Number(ringkasan.kapasitasJenis) || 0;
-  const adaPetugas = Number(ringkasan.jumlahPetugas) > 0;
-  const adaJenis = Number(ringkasan.jumlahJenis) > 0;
-
-  const labelSiap =
-    valid > 0
-      ? `${formatAngka(valid)} baris siap`
-      : adaPetugas || adaJenis
-        ? 'Tanpa baris penugasan'
-        : 'Tidak ada data';
+  const labelSiap = hasil.sumber.length ? `${formatAngka(valid)} baris siap` : 'Tidak ada data';
 
   el('import-summary').innerHTML = `
     <div class="import-summary-head">
       <div>
-        <strong>${escapeHtml(namaFile)}</strong>
-        <span>Sheet: ${escapeHtml(hasil.sheet)}${
-          petugasRekap > 0
-            ? ` · ${formatAngka(petugasRekap)} nama petugas terbaca dari kolom A sheet rekap`
-            : ''
-        }</span>
+        <strong>${formatAngka(hasil.sumber.length)} dari ${formatAngka(hasil.jumlahFile)} file siap digabungkan</strong>
+        ${hasil.sumber.map(({ nama, ringkasan: info }) => `<span>${escapeHtml(nama)} · ${formatAngka(info.jumlahBaris)} baris${
+          info.tahunAnalisis ? ` · Tahun B3 ${info.tahunAnalisis}` : ''
+        }</span>`).join('')}
       </div>
       <span class="badge ${valid > 0 ? 'badge-ok' : 'badge-muted'}">${labelSiap}</span>
     </div>
     <dl class="import-facts">
-      <div><dt>Petugas</dt><dd>${formatAngka(ringkasan.jumlahPetugas)}${
-        kapasitas > 0 ? ` / ${formatAngka(kapasitas)}` : ''
-      }</dd></div>
-      <div><dt>Jenis kegiatan</dt><dd>${formatAngka(ringkasan.jumlahJenis)}${
-        kapasitasJenis > 0 ? ` / ${formatAngka(kapasitasJenis)}` : ''
-      }</dd></div>
-      <div><dt>Tahun analisis (B3)</dt><dd>${
-        ringkasan.tahunAnalisis ? formatAngka(ringkasan.tahunAnalisis) : '—'
-      }</dd></div>
+      <div><dt>Petugas terbaca</dt><dd>${formatAngka(ringkasan.jumlahPetugas)}</dd></div>
+      <div><dt>Jenis kegiatan terbaca</dt><dd>${formatAngka(ringkasan.jumlahJenis)}</dd></div>
       <div><dt>Tahun penugasan</dt><dd>${escapeHtml(tahun)}</dd></div>
       <div><dt>Total honor</dt><dd>${formatRupiah(ringkasan.totalHonor)}</dd></div>
       <div><dt>Belum lengkap</dt><dd>${
@@ -147,7 +129,7 @@ function renderPratinjau(hasil, namaFile) {
         (baris) => `
           <div class="error-row">
             <span class="error-row-no">Baris ${baris.baris}</span>
-            <span>${escapeHtml(baris.masalah.join(' '))}</span>
+            <span><strong>${escapeHtml(baris.nama)}.</strong> ${escapeHtml(baris.masalah.join(' '))}</span>
           </div>`
       )
       .join('');
@@ -160,54 +142,54 @@ function renderPratinjau(hasil, namaFile) {
     el('import-errors').hidden = true;
   }
 
-  // Impor tetap boleh walau belum ada penugasan, asalkan file memuat data master
-  // (petugas dan/atau jenis kegiatan). Alur kerja: isi nama petugas atau daftar
-  // jenis di Excel dulu, penugasan menyusul di web.
-  const bolehTerapkan = valid > 0 || adaPetugas || adaJenis;
-
-  let labelTombol = 'Tidak ada data untuk diterapkan';
-  if (valid > 0) labelTombol = `Terapkan ${formatAngka(valid)} Baris`;
-  else if (adaPetugas && adaJenis) labelTombol = 'Terapkan Petugas & Jenis';
-  else if (adaPetugas) labelTombol = 'Terapkan Daftar Petugas';
-  else if (adaJenis) labelTombol = 'Terapkan Daftar Jenis';
-
-  const tombol = el('terapkan-impor');
-  tombol.disabled = !bolehTerapkan;
-  tombol.textContent = labelTombol;
-
   el('import-preview').hidden = false;
 }
 
-async function pilihFile(file) {
-  if (!file || state.sibuk) return;
-  if (!/\.xlsx$/i.test(file.name)) {
-    await dialogPesan(
-      'Format tidak didukung',
-      'Pilih file berformat .xlsx. File .xls atau .csv belum didukung.',
-      'error'
-    );
-    return;
-  }
-
+async function pilihFile(daftarFile) {
+  const files = Array.from(daftarFile || []);
+  if (!files.length || state.sibuk) return;
   resetPratinjau();
-  setSibuk(true);
+  setSibuk(true, true);
 
   try {
-    const hasil = await imporFileExcel(file);
-    state.hasil = hasil;
-    state.fileNama = file.name;
-    renderPratinjau(hasil, file.name);
-    if (hasil.errors.length > 0) {
-      toast(
-        `${formatAngka(hasil.errors.length)} baris dilewati karena datanya tidak valid.`,
-        'info'
-      );
-    } else if (Number(hasil.ringkasan.jumlahBelumLengkap) > 0) {
-      toast(
-        `${formatAngka(hasil.ringkasan.jumlahBelumLengkap)} baris belum lengkap dan tetap akan diimpor.`,
-        'info'
-      );
+    const hasil = { sumber: [], errors: [], peringatan: [], template: null, jumlahFile: files.length };
+    for (const file of files) {
+      try {
+        if (!/\.xlsx$/i.test(file.name)) throw new Error('Pilih file berformat .xlsx.');
+        const impor = await imporFileExcel(file);
+        for (const baris of impor.errors) hasil.errors.push({ ...baris, nama: file.name });
+        for (const pesan of impor.peringatan) hasil.peringatan.push(`${file.name}: ${pesan}`);
+        if (!impor.data.petugas.length && !impor.data.jenis.length && !impor.data.penugasan.length) {
+          hasil.peringatan.push(`${file.name}: Tidak ada data yang bisa digabungkan.`);
+          continue;
+        }
+        const { data, ringkasan } = impor;
+        hasil.sumber.push({ nama: file.name, data, ringkasan });
+        if (impor.template) hasil.template = { file: impor.template, ringkasan };
+      } catch (kesalahan) {
+        hasil.peringatan.push(`${file.name}: ${kesalahan.message}`);
+      }
     }
+
+    const dataImpor = hasil.sumber.map(({ data }) => data);
+    hasil.ringkasan = ringkasanDataset(gabungkanDataset(datasetKosong(), dataImpor));
+    if (hasil.template) {
+      const gabungan = gabungkanDataset(bacaDataset(), dataImpor);
+      const { kapasitasPetugas, kapasitasPenugasan, kapasitasJenis } = hasil.template.ringkasan;
+      if (
+        gabungan.petugas.length > kapasitasPetugas ||
+        gabungan.penugasan.length > kapasitasPenugasan ||
+        gabungan.jenis.length > kapasitasJenis
+      ) {
+        hasil.peringatan.push(
+          `Data gabungan melebihi kapasitas ekspor ${hasil.template.file.nama} ` +
+          `(${formatAngka(kapasitasPetugas)} petugas, ${formatAngka(kapasitasPenugasan)} penugasan, ` +
+          `${formatAngka(kapasitasJenis)} jenis). Perluas rentang template untuk mengekspor semuanya.`
+        );
+      }
+    }
+    state.hasil = hasil;
+    renderPratinjau(hasil);
   } catch (kesalahan) {
     await dialogPesan('Gagal membaca Excel', kesalahan.message, 'error');
   } finally {
@@ -216,60 +198,45 @@ async function pilihFile(file) {
 }
 
 async function terapkanImpor() {
-  if (!state.hasil || state.sibuk) return;
-  const ringkasan = state.hasil.ringkasan;
-  const valid = ringkasan.jumlahBaris;
-  const adaMaster = ringkasan.jumlahPetugas > 0 || ringkasan.jumlahJenis > 0;
-  if (valid === 0 && !adaMaster) {
-    toast('Tidak ada data yang bisa diimpor dari file ini.', 'error');
-    return;
-  }
-
-  const lama = bacaDataset().penugasan.length;
-  const lanjut = await konfirmasiHapus({
-    judul: 'Timpa semua data?',
-    html: `<p style="margin:0 0 8px">Data saat ini <strong>${formatAngka(lama)} baris</strong>
-      akan diganti dengan <strong>${formatAngka(valid)} baris penugasan</strong>,
-      <strong>${formatAngka(ringkasan.jumlahPetugas)} petugas</strong>, dan
-      <strong>${formatAngka(ringkasan.jumlahJenis)} jenis kegiatan</strong> dari
-      <strong>${escapeHtml(state.fileNama)}</strong>.</p>
-      <p style="margin:0">Data lama dicadangkan otomatis di browser ini sebelum ditimpa.</p>`,
-    teksTombol: 'Ya, timpa data',
-  });
-  if (!lanjut) return;
-
-  const backupBerhasil = simpanBackup(bacaDataset());
+  const hasil = state.hasil;
+  if (!hasil?.sumber.length || state.sibuk) return;
+  setSibuk(true);
   try {
-    simpanDataset(state.hasil.data);
+    const lama = bacaDataset();
+    const gabungan = gabungkanDataset(lama, hasil.sumber.map(({ data }) => data));
+    const backupBerhasil = simpanBackup(lama);
+    simpanDataset(gabungan);
 
     // Simpan file impor sebagai cetakan ekspor berikutnya.
     let catatanTemplate = '';
-    if (state.hasil.template) {
+    if (hasil.template) {
       try {
         simpanTemplate({
-          nama: state.hasil.template.nama,
-          base64: state.hasil.template.base64,
-          bytes: state.hasil.template.bytes,
+          ...hasil.template.file,
           disimpan: new Date().toISOString(),
         });
       } catch (kesalahan) {
-        catatanTemplate = kesalahan.message;
+        catatanTemplate = 'Cetakan ekspor baru gagal disimpan. Aplikasi memakai cetakan sebelumnya jika tersedia.';
       }
     }
 
-    const tahunTerbaru = state.hasil.ringkasan.tahunAnalisis || state.hasil.ringkasan.tahun[0];
-    if (tahunTerbaru) setTahunGlobal(tahunTerbaru);
+    const tahunAktif = bacaTahunAktif();
+    const tahunGabungan = ringkasanDataset(gabungan).tahun;
+    const fileTerakhir = hasil.sumber[hasil.sumber.length - 1];
+    const tahunAnalisis = fileTerakhir.ringkasan.tahunAnalisis;
+    const tahunImpor = tahunGabungan.includes(tahunAnalisis)
+      ? tahunAnalisis
+      : hasil.ringkasan.tahun[0] ?? tahunGabungan[0] ?? tahunAnalisis;
+    if (tahunImpor && !tahunGabungan.includes(tahunAktif)) setTahunGlobal(tahunImpor);
 
     toast(
-      `Impor berhasil: ${formatAngka(valid)} baris, ${formatAngka(
-        ringkasan.jumlahPetugas
-      )} petugas, ${formatAngka(ringkasan.jumlahJenis)} jenis, ${formatAngka(
-        state.hasil.errors.length
-      )} baris dilewati.`
+      `Impor berhasil. Ditambahkan ${formatAngka(hasil.ringkasan.jumlahBaris)} penugasan, ${formatAngka(
+        gabungan.petugas.length - lama.petugas.length
+      )} petugas baru, dan ${formatAngka(gabungan.jenis.length - lama.jenis.length)} jenis baru.`
     );
-    if (Number(ringkasan.jumlahBelumLengkap) > 0) {
+    if (hasil.ringkasan.jumlahBelumLengkap > 0) {
       toast(
-        `${formatAngka(ringkasan.jumlahBelumLengkap)} baris belum lengkap. Buka Daftar Penugasan lalu pilih filter "Belum lengkap" untuk melengkapinya.`,
+        `${formatAngka(hasil.ringkasan.jumlahBelumLengkap)} baris belum lengkap. Buka Daftar Penugasan lalu pilih filter "Belum lengkap" untuk melengkapinya.`,
         'info'
       );
     }
@@ -277,10 +244,12 @@ async function terapkanImpor() {
     resetPratinjau();
     perbaruiStatistik();
     if (!backupBerhasil) {
-      toast('Backup otomatis gagal dibuat. Ekspor data lama segera bila masih diperlukan.', 'error');
+      toast('Cadangan otomatis sebelum impor gagal disimpan.', 'error');
     }
   } catch (kesalahan) {
     await dialogPesan('Gagal menyimpan data', kesalahan.message, 'error');
+  } finally {
+    setSibuk(false);
   }
 }
 
@@ -465,8 +434,7 @@ dropzone.addEventListener('keydown', (event) => {
 });
 
 inputFile.addEventListener('change', () => {
-  const file = inputFile.files?.[0];
-  if (file) pilihFile(file);
+  pilihFile(inputFile.files);
 });
 
 for (const namaEvent of ['dragenter', 'dragover']) {
@@ -482,8 +450,7 @@ for (const namaEvent of ['dragleave', 'dragend', 'drop']) {
   });
 }
 dropzone.addEventListener('drop', (event) => {
-  const file = event.dataTransfer?.files?.[0];
-  if (file) pilihFile(file);
+  pilihFile(event.dataTransfer?.files);
 });
 
 el('batal-impor').addEventListener('click', resetPratinjau);

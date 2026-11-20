@@ -1,5 +1,6 @@
 import { api } from './api.js';
 import { escapeHtml } from './format.js';
+import { keluar, periksaSesi } from './sesi.js';
 import { pantauPerubahanLintasTab } from './store/penyimpanan.js';
 
 const IKON = {
@@ -114,6 +115,7 @@ function renderTopbar({ judul, deskripsi, tahun, daftarTahun }) {
         <span>Tahun</span>
         <select id="pilih-tahun" aria-label="Pilih tahun aktif">${opsi}</select>
       </label>
+      <button type="button" class="btn btn-secondary" id="keluar">Keluar</button>
     </div>`;
 }
 
@@ -172,6 +174,11 @@ export function setTahunGlobal(tahun) {
 }
 
 export async function initLayout({ active, judul, deskripsi }) {
+  if (!periksaSesi()) {
+    // Hentikan bootstrap halaman sampai navigasi ke login selesai.
+    return new Promise(() => {});
+  }
+  window.addEventListener('pageshow', periksaSesi);
   renderSidebar(active);
   const tahun = bacaTahunAktif();
   simpanTahun(tahun);
@@ -192,6 +199,8 @@ export async function initLayout({ active, judul, deskripsi }) {
   });
   sinkronTahun(tahun);
   pasangMenuMobile();
+  document.getElementById('keluar')?.addEventListener('click', keluar);
+  document.body.hidden = false;
 
   pantauPerubahanLintasTab(() => {
     document.dispatchEvent(

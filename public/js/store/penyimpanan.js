@@ -255,6 +255,47 @@ export function idBerikutnya(daftar) {
   return daftar.reduce((maks, baris) => Math.max(maks, Number(baris.id) || 0), 0) + 1;
 }
 
+/** Tambahkan hasil impor sambil memetakan ulang ID lokal dari tiap file. */
+export function gabungkanDataset(dataLama, sumberImpor) {
+  const hasil = normalisasiDataset(dataLama);
+  const siapkanMaster = (daftar) => {
+    const perNama = new Map(daftar.map((baris) => [rapikanTeks(baris.nama).toLowerCase(), baris.id]));
+    let idBaru = idBerikutnya(daftar);
+    let urutanBaru = daftar.reduce((maks, baris) => Math.max(maks, baris.urutan), 0) + 1;
+
+    return (daftarImpor) => {
+      const petaId = new Map();
+      for (const { id, nama } of daftarImpor) {
+        const kunci = rapikanTeks(nama).toLowerCase();
+        if (!perNama.has(kunci)) {
+          perNama.set(kunci, idBaru);
+          daftar.push({ id: idBaru++, nama, urutan: urutanBaru++ });
+        }
+        petaId.set(id, perNama.get(kunci));
+      }
+      return petaId;
+    };
+  };
+
+  const tambahPetugas = siapkanMaster(hasil.petugas);
+  const tambahJenis = siapkanMaster(hasil.jenis);
+  let idPenugasan = idBerikutnya(hasil.penugasan);
+  for (const sumber of sumberImpor) {
+    const data = normalisasiDataset(sumber);
+    const petugas = tambahPetugas(data.petugas);
+    const jenis = tambahJenis(data.jenis);
+    for (const baris of data.penugasan) {
+      hasil.penugasan.push({
+        ...baris,
+        id: idPenugasan++,
+        petugas_id: petugas.get(baris.petugas_id),
+        jenis_kegiatan_id: jenis.get(baris.jenis_kegiatan_id) ?? null,
+      });
+    }
+  }
+  return hasil;
+}
+
 /* -------------------------------------------------------------------------
    File template yang diimpor
 

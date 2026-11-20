@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Masuk — Dashboard Honor</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/login.js"></script>
+</head>
+<body class="login-page">
+  <main class="card login-card" aria-labelledby="judul-login">
+    <div class="brand-mark" aria-hidden="true">BPS</div>
+    <h1 id="judul-login">Masuk ke Dashboard Honor</h1>
+    <form id="form-login" method="post" class="login-form">
+      <div class="field">
+        <label for="nama-pengguna">Username</label>
+        <input type="text" id="nama-pengguna" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </div>
+      <div class="field">
+        <label for="kata-sandi">Password</label>
+        <input type="password" id="kata-sandi" name="password" autocomplete="current-password" required>
+      </div>
+      <p id="pesan-login" class="login-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary" id="masuk" disabled>Masuk</button>
+    </form>
+    <noscript>Aktifkan JavaScript untuk masuk.</noscript>
+  </main>
+</body>
+</html>

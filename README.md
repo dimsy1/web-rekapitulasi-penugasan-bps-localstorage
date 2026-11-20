@@ -51,12 +51,17 @@ dibuat saat namanya diketik.
 **Mulai dari file Excel yang sudah ada**
 
 1. Buka halaman **Data & Excel**.
-2. Klik atau seret file `.xlsx` ke area impor.
+2. Pilih atau seret satu atau beberapa file `.xlsx` ke area impor.
 3. Periksa pratinjau (jumlah petugas, jenis, tahun analisis B3, total honor, baris
    bermasalah, dan catatan bila ada nama yang tidak konsisten).
-4. Klik **Terapkan Impor**. Data lama ditimpa dan dibackup otomatis.
+4. Klik **Gabungkan Data** untuk menambahkan hasil impor ke data yang sudah tersimpan.
 5. Setelah itu semua perubahan di web tersimpan otomatis di browser.
 6. Untuk arsip atau pindah perangkat: **Unduh Sesuai Template Excel**.
+
+Nama petugas dan jenis kegiatan yang sama berbagi satu entri, dengan mengabaikan
+kapitalisasi dan perbedaan spasi. Setiap baris penugasan ditambahkan, termasuk
+jika file yang sama diimpor ulang. Jika sebuah file gagal dibaca, pratinjau
+menampilkan nama file dan alasannya. File lain yang berhasil dibaca tetap bisa digabungkan.
 
 Impor boleh dilakukan walau sheet `Data Penugasan` masih kosong, asalkan kolom A
 sheet rekap atau sheet `Referensi` sudah berisi data. Jadi alur yang disarankan:
@@ -105,8 +110,10 @@ Header sheet `Data Penugasan` dicari otomatis:
 - Baris yang benar-benar tidak valid (misalnya bulan salah tulis) dilewati dan
   ditampilkan pada pratinjau.
 - Urutan nama petugas mengikuti urutan yang Anda tulis di kolom A sheet rekap.
-- Bila nama hanya ada di salah satu sheet rekap, atau jumlahnya melebihi kapasitas
-  template, pratinjau menampilkan peringatan (impor tetap bisa dilanjutkan).
+- Impor membaca seluruh baris yang terisi, termasuk nama di luar rentang formula
+  rekap. Baris berlabel `TOTAL` dilewati.
+- Bila jumlah petugas atau penugasan melebihi kapasitas ekspor template,
+  pratinjau menampilkan peringatan dan impor tetap bisa dilanjutkan.
 
 #### Baris belum lengkap
 

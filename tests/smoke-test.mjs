@@ -35,7 +35,7 @@ globalThis.ExcelJS = ExcelJS;
 const { imporFileExcel, buatWorkbook, buatWorkbookTemplate } = await import(
   '../public/js/store/excel.js'
 );
-const { simpanDataset, bacaDataset, datasetKosong } = await import(
+const { simpanDataset, bacaDataset, datasetKosong, gabungkanDataset } = await import(
   '../public/js/store/penyimpanan.js'
 );
 const { api, ApiError } = await import('../public/js/api.js');
@@ -359,6 +359,47 @@ async function uji() {
   assert.ok(hasilTemplate.template && hasilTemplate.template.base64, 'file template disimpan sebagai cetakan');
   console.log('OK impor petugas dari sheet rekap, tahun B3, dan judul jenis');
 
+  // Template lama memiliki 50 baris berformula, tetapi nama bisa ditulis lebih jauh.
+  const namaTambahan = Array.from({ length: 81 }, (_, indeks) => `Petugas tambahan ${indeks + 1}`);
+  let barisRekap = 10;
+  for (const nama of namaTambahan) {
+    if (barisRekap === 56) barisRekap = 58; // Jeda dan baris TOTAL template lama.
+    wsBulanan.getCell(barisRekap, 1).value = nama;
+    barisRekap += 1;
+  }
+  for (let baris = 6; baris <= 55; baris += 1) {
+    wsBulanan.getCell(baris, 2).value = {
+      formula: `SUMIFS('Data Penugasan'!$G$5:$G$304,'Data Penugasan'!$B$5:$B$304,$A${baris})`,
+    };
+  }
+  wsBulanan.getCell('A57').value = 'TOTAL';
+  wsJenis.getCell('A57').value = 'TOTAL';
+  wsJenis.getCell('A5001').value = 'Hanya di Rekap Jenis';
+
+  for (let baris = 6; baris <= 305; baris += 1) {
+    wsData.getCell(baris, 2).value = 'Siti Aminah';
+  }
+  const bufferBesar = await wbTemplate.xlsx.writeBuffer();
+  const hasilBesar = await imporFileExcel({
+    name: 'template-lama-banyak-baris.xlsx',
+    arrayBuffer: async () => bufferBesar,
+  });
+  assert.deepEqual(hasilBesar.data.petugas.map((baris) => baris.nama), [
+    'Budi Santoso', 'Siti Aminah', 'Andi Wijaya', 'Tanpa Penugasan',
+    ...namaTambahan, 'Hanya di Rekap Jenis',
+  ]);
+  assert.equal(hasilBesar.ringkasan.jumlahPetugasRekap, 86);
+  assert.equal(hasilBesar.ringkasan.kapasitasPetugas, 50);
+  assert.equal(hasilBesar.ringkasan.kapasitasPenugasan, 300);
+  assert.equal(hasilBesar.data.penugasan.length, 301);
+  assert.equal(hasilBesar.errors.length, 0);
+  assert.ok(hasilBesar.peringatan.some((pesan) => pesan.includes('Semua 86 nama petugas')));
+  assert.ok(hasilBesar.peringatan.some((pesan) => pesan.includes('Semua 301 penugasan')));
+  simpanDataset(hasilBesar.data);
+  assert.equal(bacaDataset().petugas.length, 86);
+  assert.equal(bacaDataset().penugasan.length, 301);
+  console.log('OK impor menyimpan seluruh petugas dan penugasan di luar kapasitas ekspor');
+
   // --- File yang hanya berisi sheet Referensi --------------------------------
   const wbReferensi = new ExcelJS.Workbook();
   wbReferensi.addWorksheet('Dashboard');
@@ -441,6 +482,37 @@ async function uji() {
   );
   console.log('OK jenis dari Referensi bisa diedit/ditambah lalu diekspor kembali');
 
+  // Kapasitas kolom ekspor tidak membatasi jenis yang diimpor dari Referensi.
+  const daftarJenisPanjang = Array.from({ length: 20 }, (_, indeks) => `Jenis ${indeks + 1}`);
+  daftarJenisPanjang.forEach((nama, indeks) => {
+    wsRefBaru.getCell(3 + indeks, 1).value = nama;
+  });
+  const bufferJenisPanjang = await wbReferensi.xlsx.writeBuffer();
+  const hasilJenisPanjang = await imporFileExcel({
+    name: 'referensi-20-jenis.xlsx',
+    arrayBuffer: async () => bufferJenisPanjang,
+  });
+  assert.deepEqual(hasilJenisPanjang.data.jenis.map(({ nama }) => nama), daftarJenisPanjang);
+  assert.equal(hasilJenisPanjang.ringkasan.jumlahJenis, 20);
+  assert.ok(hasilJenisPanjang.ringkasan.kapasitasJenis < 20);
+  assert.ok(hasilJenisPanjang.peringatan.some((pesan) => pesan.includes('Semua 20 jenis kegiatan')));
+  simpanDataset(hasilJenisPanjang.data);
+  assert.equal(bacaDataset().jenis.length, 20);
+
+  // Jika Referensi kosong, judul jenis yang ditambahkan setelah Total Honor ikut dibaca.
+  wbReferensi.removeWorksheet(wsRefBaru.id);
+  wsJenisLama.getCell('T5').value = 'Jenis di luar rentang rekap';
+  const bufferJenisRekap = await wbReferensi.xlsx.writeBuffer();
+  const hasilJenisRekap = await imporFileExcel({
+    name: 'jenis-dari-judul-rekap.xlsx',
+    arrayBuffer: async () => bufferJenisRekap,
+  });
+  assert.deepEqual(hasilJenisRekap.data.jenis.map(({ nama }) => nama), [
+    'Survei', 'Sensus', 'Pengolahan Data', 'Pembinaan Statistik Sektoral', 'Koordinasi',
+    'Jenis di luar rentang rekap',
+  ]);
+  console.log('OK impor 20 jenis kegiatan dan judul jenis di luar rentang rekap');
+
   // --- Referensi yang menyusut: jenis lama yang masih dipakai diberi tahu ----
   const wbSisa = new ExcelJS.Workbook();
   wbSisa.addWorksheet('Dashboard');
@@ -480,6 +552,28 @@ async function uji() {
     'peringatan untuk jenis di luar Referensi'
   );
   console.log('OK jenis di luar Referensi tetap aman dan diberi peringatan');
+
+  // Kedua workbook memakai ID lokal yang sama untuk entri yang berbeda.
+  const dataLama = {
+    petugas: [{ id: 10, nama: 'siti aminah', urutan: 5 }],
+    jenis: [{ id: 12, nama: 'SENSUS', urutan: 8 }],
+    penugasan: [{ id: 20, petugas_id: 10, jenis_kegiatan_id: 12, tahun: 2025, honor: 100 }],
+  };
+  const gabungan = gabungkanDataset(dataLama, [hasilTemplate.data, hasilSisa.data]);
+  const tersimpan = simpanDataset(gabungan);
+  assert.equal(dataLama.penugasan.length, 1, 'penggabungan tidak mengubah sumber');
+  assert.deepEqual(tersimpan.petugas.map(({ nama }) => nama), [
+    'siti aminah', 'Budi Santoso', 'Andi Wijaya', 'Tanpa Penugasan', 'Petugas Lama',
+  ]);
+  assert.deepEqual(tersimpan.jenis.map(({ nama }) => nama), [
+    'SENSUS', 'Survei', 'Pengolahan Data', 'Pemeriksaan',
+  ]);
+  assert.deepEqual(tersimpan.penugasan.map(({ id, tahun, petugas_id, jenis_kegiatan_id }) => [
+    id, tahun, petugas_id, jenis_kegiatan_id,
+  ]), [[20, 2025, 10, 12], [21, 2026, 10, 12], [22, 2027, 14, 13]]);
+  assert.deepEqual(tersimpan.penugasan.map(({ honor }) => honor), [100, 2000000, 500000]);
+  assert.equal(gabungkanDataset(tersimpan, [hasilSisa.data]).penugasan.length, 4);
+  console.log('OK gabung beberapa workbook dengan data lama, ID dan relasi tetap benar');
 
   console.log('\nSEMUA UJI LULUS');
 }

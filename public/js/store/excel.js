@@ -170,10 +170,8 @@ function bacaBarisData(worksheet) {
 
   const records = [];
   const errors = [];
-  const terakhir = worksheet.rowCount || 0;
-
-  for (let nomor = header.nomor + 1; nomor <= terakhir; nomor += 1) {
-    const row = worksheet.getRow(nomor);
+  worksheet.eachRow((row, nomor) => {
+    if (nomor <= header.nomor) return;
     const ambil = (kunci) => nilaiSel(row.getCell(header.kolom.get(kunci)));
 
     const petugas = rapikanTeks(ambil('petugas'));
@@ -190,7 +188,7 @@ function bacaBarisData(worksheet) {
       rapikanTeks(bulanMentah) === '' &&
       rapikanTeks(tahunMentah) === '' &&
       rapikanTeks(honorMentah) === '';
-    if (kosong) continue;
+    if (kosong) return;
 
     const masalah = [];
     // Hanya nama petugas yang wajib. Kolom lain boleh kosong: baris tetap
@@ -223,7 +221,7 @@ function bacaBarisData(worksheet) {
 
     if (masalah.length > 0) {
       errors.push({ baris: nomor, masalah });
-      continue;
+      return;
     }
 
     records.push({
@@ -235,7 +233,7 @@ function bacaBarisData(worksheet) {
       tahun,
       honor,
     });
-  }
+  });
 
   return { header, records, errors };
 }
@@ -246,18 +244,15 @@ function bacaReferensi(workbook) {
 
   const hasil = [];
   const terpakai = new Set();
-  const terakhir = sheet.rowCount || 0;
-  for (let nomor = 1; nomor <= terakhir; nomor += 1) {
-    const teks = rapikanTeks(nilaiSel(sheet.getRow(nomor).getCell(1)));
-    if (!teks) continue;
-    if (/^daftar jenis kegiatan/i.test(teks)) continue;
-    if (/^petunjuk/i.test(teks)) continue;
-    if (teks.length > 100) continue;
+  sheet.eachRow((row) => {
+    const teks = rapikanTeks(nilaiSel(row.getCell(1)));
+    if (!teks || teks.length > 100) return;
+    if (/^daftar jenis kegiatan/i.test(teks) || /^petunjuk/i.test(teks)) return;
     const kunci = teks.toLowerCase();
-    if (terpakai.has(kunci)) continue;
+    if (terpakai.has(kunci)) return;
     terpakai.add(kunci);
     hasil.push(teks);
-  }
+  });
   return hasil;
 }
 
@@ -375,18 +370,20 @@ export function deteksiStrukturTemplate(workbook) {
   return struktur;
 }
 
-/** Daftar nama petugas dari kolom A kedua sheet rekap template. */
-export function bacaPetugasRekap(workbook, struktur) {
+/** Baca kolom A di seluruh baris terisi, termasuk di luar rentang formula. */
+export function bacaPetugasRekap(workbook, { petugasAwal }) {
   const baca = (namaSheet) => {
     const sheet = cariSheet(workbook, namaSheet);
     if (!sheet) return [];
     const daftar = [];
-    for (let baris = struktur.petugasAwal; baris <= struktur.petugasAkhir; baris += 1) {
-      const teks = rapikanTeks(nilaiSel(sheet.getRow(baris).getCell(1)));
-      if (!teks || teks.length > 150) continue;
-      if (normalisasiTeks(teks) === 'namapetugas') continue;
+    sheet.eachRow((row, nomor) => {
+      if (nomor < petugasAwal) return;
+      const teks = rapikanTeks(nilaiSel(row.getCell(1)));
+      if (!teks || teks.length > 150) return;
+      const label = normalisasiTeks(teks);
+      if (label === 'namapetugas' || label === 'total') return;
       daftar.push(teks);
-    }
+    });
     return daftar;
   };
 
@@ -423,17 +420,18 @@ export function bacaTahunAnalisis(workbook) {
   return parseTahun(typeof nilai === 'number' ? nilai : String(nilai));
 }
 
-/** Judul kolom jenis kegiatan dari baris 5 sheet Rekap Jenis Kegiatan. */
-export function bacaJenisRekap(workbook, struktur) {
+/** Baca judul jenis sepanjang baris 5, termasuk di luar kolom cetakan ekspor. */
+export function bacaJenisRekap(workbook) {
   const sheet = cariSheet(workbook, NAMA_SHEET_REKAP_JENIS);
   if (!sheet) return [];
   const hasil = [];
-  for (let kolom = struktur.kolomJenisAwal; kolom <= struktur.kolomJenisAkhir; kolom += 1) {
-    const teks = rapikanTeks(nilaiSel(sheet.getRow(5).getCell(kolom)));
-    if (!teks || teks.length > 100) continue;
-    if (normalisasiTeks(teks) === LABEL_TOTAL_JENIS) continue;
+  sheet.getRow(5).eachCell((cell, kolom) => {
+    if (kolom < 2) return;
+    const teks = rapikanTeks(nilaiSel(cell));
+    if (!teks || teks.length > 100) return;
+    if (normalisasiTeks(teks) === LABEL_TOTAL_JENIS) return;
     hasil.push(teks);
-  }
+  });
   return hasil;
 }
 
@@ -572,7 +570,7 @@ export async function imporFileExcel(file) {
   const struktur = deteksiStrukturTemplate(workbook);
   const { records, errors } = bacaBarisData(worksheet);
   const referensi = bacaReferensi(workbook);
-  const jenisRekap = bacaJenisRekap(workbook, struktur);
+  const jenisRekap = bacaJenisRekap(workbook);
   const petugasRekap = bacaPetugasRekap(workbook, struktur);
   const tahunAnalisis = bacaTahunAnalisis(workbook);
 
@@ -600,11 +598,7 @@ export async function imporFileExcel(file) {
     );
   }
   const kapasitas = struktur.petugasAkhir - struktur.petugasAwal + 1;
-  if (petugasRekap.daftar.length > kapasitas) {
-    peringatan.push(
-      `Template hanya menyediakan ${kapasitas} baris petugas di sheet rekap, sedangkan file memuat ${petugasRekap.daftar.length} nama.`
-    );
-  }
+  const kapasitasPenugasan = struktur.dataAkhir - struktur.dataAwal + 1;
   if (petugasRekap.hanyaBulanan.length > 0) {
     peringatan.push(
       `${petugasRekap.hanyaBulanan.length} nama hanya ada di kolom A sheet Rekap Honor Bulanan: ${petugasRekap.hanyaBulanan.slice(0, 3).join(', ')}${petugasRekap.hanyaBulanan.length > 3 ? ', …' : ''}.`
@@ -617,7 +611,12 @@ export async function imporFileExcel(file) {
   }
   if (data.petugas.length > kapasitas) {
     peringatan.push(
-      `Total nama petugas (termasuk dari Data Penugasan) ${data.petugas.length} melebihi kapasitas template ${kapasitas}. Kurangi sebelum mengekspor.`
+      `Semua ${data.petugas.length} nama petugas dapat diimpor. Untuk mengekspor semuanya, rentang rekap pada template perlu diperluas dari ${kapasitas} baris.`
+    );
+  }
+  if (data.penugasan.length > kapasitasPenugasan) {
+    peringatan.push(
+      `Semua ${data.penugasan.length} penugasan yang valid dapat diimpor. Untuk mengekspor semuanya, rentang Data Penugasan pada template perlu diperluas dari ${kapasitasPenugasan} baris.`
     );
   }
   if (jenisRekap.length > 0 && referensi.length > 0) {
@@ -655,7 +654,7 @@ export async function imporFileExcel(file) {
   }
   if (struktur.kolomJenisMaks > 0 && data.jenis.length > struktur.kolomJenisMaks) {
     peringatan.push(
-      `Total jenis kegiatan ${data.jenis.length} melebihi kapasitas template ${struktur.kolomJenisMaks} jenis. Kurangi jenis atau tambah kolom pada file template sebelum mengekspor.`
+      `Semua ${data.jenis.length} jenis kegiatan dapat diimpor. Untuk mengekspor semuanya, rentang Rekap Jenis Kegiatan pada template perlu diperluas dari ${struktur.kolomJenisMaks} kolom jenis.`
     );
   }
   if (tahunAnalisis === null) {
@@ -669,7 +668,7 @@ export async function imporFileExcel(file) {
     jumlahPetugasTanpaPenugasan: tanpaPenugasan,
     kapasitasPetugas: kapasitas,
     kapasitasJenis: struktur.kolomJenisMaks,
-    kapasitasPenugasan: struktur.dataAkhir - struktur.dataAwal + 1,
+    kapasitasPenugasan,
   };
 
   return {

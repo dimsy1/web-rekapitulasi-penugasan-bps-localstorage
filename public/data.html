@@ -7,7 +7,7 @@
   <meta name="description" content="Impor dan ekspor data penugasan petugas dari/ke file Excel.">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body data-page="data">
+<body data-page="data" hidden>
   <div class="mobile-overlay" id="mobile-overlay" hidden></div>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar"></aside>
@@ -72,8 +72,8 @@
                   <path d="M4 16v3.5h16V16"></path>
                 </svg>
                 <strong>Klik atau seret file Excel ke sini</strong>
-                <span>Format .xlsx — satu baris untuk setiap penugasan</span>
-                <input type="file" id="file-excel" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+                 <span>Pilih satu atau beberapa file .xlsx</span>
+                 <input type="file" id="file-excel" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
               </div>
 
               <div class="state-box state-box-compact" id="impor-loading" hidden>
@@ -90,12 +90,12 @@
                 </div>
                 <div class="import-actions">
                   <button type="button" class="btn btn-secondary" id="batal-impor">Batal</button>
-                  <button type="button" class="btn btn-primary" id="terapkan-impor">Terapkan Impor</button>
+                  <button type="button" class="btn btn-primary" id="terapkan-impor">Gabungkan Data</button>
                 </div>
                 <p class="import-warning">
-                  Impor akan <strong>menimpa seluruh data</strong> yang ada di browser ini.
-                  Data lama otomatis dicadangkan di browser ini sebelum ditimpa.
-                  File ini juga disimpan sebagai cetakan ekspor berikutnya.
+                   Data baru digabungkan dengan data yang sudah tersimpan. Petugas dan jenis dengan nama yang sama
+                   dipakai bersama. Setiap baris penugasan ditambahkan, termasuk jika file yang sama diimpor ulang.
+                   File template terakhir yang datanya diterapkan menjadi cetakan ekspor.
                 </p>
               </div>
             </section>

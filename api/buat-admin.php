@@ -12,6 +12,10 @@ require __DIR__ . '/bootstrap.php';
 
 $tokenBenar = (string) konfig('setup_token', '');
 $tokenSiap = $tokenBenar !== '' && strpos($tokenBenar, 'GANTI_') !== 0;
+// Nilai contoh yang tertulis di README/repo tidak boleh dipakai: siapa pun
+// yang membacanya bisa membuat akun admin baru.
+$tokenLemah = in_array($tokenBenar, ['lokal-ganti-token', 'ganti-token-ini'], true)
+    || strlen($tokenBenar) < 16;
 
 function h($teks): string
 {
@@ -37,9 +41,12 @@ function halaman(string $judul, string $isi, int $kode = 200): void
     exit;
 }
 
-if (!$tokenSiap) {
-    halaman('Belum siap', '<div class="pesan galat">Isi <code>setup_token</code> di '
-        . '<code>api/config.php</code> dengan nilai acak yang panjang, lalu buka halaman ini lagi.</div>', 503);
+if (!$tokenSiap || $tokenLemah) {
+    halaman('Belum siap', '<div class="pesan galat">Pembuat akun lewat web dinonaktifkan karena '
+        . '<code>setup_token</code> masih kosong atau masih memakai nilai contoh. '
+        . 'Untuk lokal, jalankan <code>npm run admin</code> di terminal. '
+        . 'Untuk hosting, isi <code>setup_token</code> di <code>api/config.php</code> dengan '
+        . 'nilai acak minimal 16 karakter, lalu buka halaman ini lagi.</div>', 503);
 }
 
 $tokenDikirim = (string) ($_POST['token'] ?? $_GET['token'] ?? '');

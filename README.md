@@ -101,11 +101,21 @@ disajikan dari akar situs.
   ```
 
   Akun baru langsung aktif dan tercatat di tabel `admin`.
+- Mengganti password admin (semua sesi lama otomatis berakhir):
+
+  ```bash
+  npm run sandi
+  ```
+
+  Atau langsung: `php tools/ganti-sandi.php username password-baru`.
 - Username harus unik; password disimpan sebagai hash `password_hash` (bcrypt)
   dan diverifikasi dengan `password_verify`.
 - Sesi berupa token acak 32 byte; yang disimpan di database hanya hash SHA-256-nya,
   dan browser memegangnya lewat cookie `HttpOnly` + `SameSite=Lax` (Secure saat HTTPS).
 - Percobaan login dibatasi 8 kali per 15 menit per IP/username.
+- Semua aksi yang mengubah data wajib `POST` + header `X-Requested-With:
+  dashboard-honor`. Permintaan `GET` hanya untuk membaca data, sehingga tautan
+  dari situs lain tidak bisa menghapus atau mengubah data.
 - Setiap perubahan data dicatat di tabel `log` dan bisa dilihat di halaman
   **Data & Excel** pada panel **Admin & log aktivitas**.
 
@@ -269,6 +279,14 @@ diisi nama petugas di kolom A sheet rekap lalu diimpor kembali.
   `.htaccess`.
 - Rekap/dashboard tidak disimpan; hanya penugasan, master, dan template yang
   tersimpan di MySQL.
+- Semua respons memakai header `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options`, `Referrer-Policy`, dan `Content-Security-Policy` (skrip
+  hanya dari domain sendiri dan CDN yang dipakai: jsDelivr, jQuery, DataTables).
+- `api/buat-admin.php` menolak berjalan bila `setup_token` masih nilai contoh
+  atau kurang dari 16 karakter. Untuk lokal pakai `npm run admin`; setelah
+  membuat akun di hosting, hapus file itu dan kosongkan `setup_token`.
+- Password awal `admin12345` hanya untuk pemakaian lokal. Ganti dengan
+  `npm run sandi` sebelum dashboard dipakai bersama.
 - Backup database dapat dilakukan dari HeidiSQL/phpMyAdmin Laragon.
 
 ## Struktur proyek

@@ -9,6 +9,7 @@
     "start": "php tools/setup-local.php && php -S 127.0.0.1:8000 tools/router.php",
     "dev:static": "serve public -l 3000",
     "admin": "php tools/tambah-admin.php",
+    "sandi": "php tools/ganti-sandi.php",
     "test": "node tests/smoke-test.mjs && node tests/template-test.mjs"
   },
   "engines": {

@@ -73,6 +73,7 @@ try {
         );
         $stmt->execute(['admin', password_hash('admin12345', PASSWORD_DEFAULT)]);
         echo "Database db_selaras siap. Akun awal: admin / admin12345\n";
+        echo "Segera ganti sandi: npm run sandi admin sandi-baru-anda\n";
     } else {
         echo "Database db_selaras siap.\n";
     }

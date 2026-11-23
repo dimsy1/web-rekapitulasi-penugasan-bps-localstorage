@@ -76,6 +76,9 @@ function jawab(array $data, int $kode = 200): void
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, max-age=0');
     header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

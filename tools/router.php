@@ -9,6 +9,25 @@ declare(strict_types=1);
 $uri = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
 $root = dirname(__DIR__);
 
+// Header keamanan untuk semua respons lokal. api.php menimpanya dengan
+// kebijakan JSON yang lebih ketat.
+//
+// Halaman Data & Excel memuat ExcelJS yang memakai `new Function` untuk
+// polyfill, jadi hanya halaman itu yang diberi 'unsafe-eval'.
+$perluEval = in_array($uri, ['/data.html', '/data'], true);
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+header(
+    "Content-Security-Policy: default-src 'self'; "
+    . "script-src 'self'" . ($perluEval ? " 'unsafe-eval'" : '')
+    . ' https://cdn.jsdelivr.net https://code.jquery.com https://cdn.datatables.net; '
+    . "style-src 'self' 'unsafe-inline' https://cdn.datatables.net; "
+    . "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
+    . "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'"
+);
+
 if (str_starts_with($uri, '/api/')) {
     $nama = substr($uri, strlen('/api/'));
     if ($nama === 'api.php') {

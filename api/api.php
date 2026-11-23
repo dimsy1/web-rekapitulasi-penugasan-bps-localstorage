@@ -13,8 +13,15 @@ require __DIR__ . '/bootstrap.php';
 $aksi = isset($_GET['aksi']) ? (string) $_GET['aksi'] : '';
 $metode = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
+/** Aksi yang hanya membaca data; sisanya wajib POST + header CSRF. */
+const AKSI_BACA = ['sehat', 'sesi', 'bootstrap', 'revisi', 'log', 'template.ambil'];
+
 if ($metode === 'POST') {
     pastikan_csrf();
+} elseif (!in_array($aksi, AKSI_BACA, true)) {
+    // Tanpa aturan ini, tautan GET dari situs lain bisa mengubah data karena
+    // cookie sesi ikut terkirim pada navigasi (SameSite=Lax).
+    gagal(405, 'Aksi ini harus dikirim dengan metode POST.');
 }
 
 try {

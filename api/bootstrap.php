@@ -15,6 +15,17 @@ const COOKIE_SESI = 'sesi_honor';
 const TAHUN_MIN = 2020;
 const TAHUN_MAKS = 65535;
 
+/* Zona waktu PHP wajib sama dengan zona waktu sesi MySQL (lihat db()).
+   Hosting gratis bisa memakai zona bawaan yang berbeda jauh (mis. -05:00);
+   tanpa penyamaan ini, kolom `kedaluwarsa` pada tabel sesi dihitung dengan
+   offset yang salah sehingga sesi langsung dianggap kedaluwarsa. */
+try {
+    date_default_timezone_set((string) konfig('zona_waktu', 'Asia/Jakarta'));
+} catch (Throwable $kesalahan) {
+    // config.php belum ada/rusak: biarkan zona bawaan, error akan muncul
+    // saat koneksi database dicoba.
+}
+
 /* -------------------------------------------------------------------------
    Konfigurasi & koneksi
    ------------------------------------------------------------------------- */
@@ -54,7 +65,10 @@ function db(): PDO
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
-        $pdo->exec("SET time_zone = '+07:00'");
+        // Samakan zona waktu sesi MySQL dengan zona waktu PHP, agar NOW() dan
+        // date() menghasilkan jam yang sama di hosting mana pun.
+        $offset = (new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get())))->format('P');
+        $pdo->exec("SET time_zone = '" . $offset . "'");
     } catch (Throwable $kesalahan) {
         throw new RuntimeException(
             'Koneksi database gagal. Periksa host, nama database, dan kata sandi di api/config.php.',

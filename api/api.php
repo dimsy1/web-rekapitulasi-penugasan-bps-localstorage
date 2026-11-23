@@ -93,17 +93,20 @@ try {
             }
 
             $token = token_acak();
-            $detik = max(1, (int) konfig('sesi_jam', 8)) * 3600;
+            $jam = max(1, (int) konfig('sesi_jam', 8));
+            $detik = $jam * 3600;
             $kedaluwarsa = date('Y-m-d H:i:s', time() + $detik);
 
+            // Kedaluwarsa dihitung oleh MySQL agar selalu sejalan dengan
+            // perbandingan `kedaluwarsa > NOW()` di sesi_aktif().
             $simpan = db()->prepare(
                 'INSERT INTO sesi (token_hash, admin_id, dibuat_pada, kedaluwarsa, terakhir_dipakai, ip, user_agent)
-                 VALUES (?, ?, NOW(), ?, NOW(), ?, ?)'
+                 VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? HOUR), NOW(), ?, ?)'
             );
             $simpan->execute([
                 hash_token($token),
                 (int) $baris['id'],
-                $kedaluwarsa,
+                $jam,
                 $ip,
                 substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
             ]);

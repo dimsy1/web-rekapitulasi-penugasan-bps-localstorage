@@ -7,31 +7,41 @@ const sandi = document.getElementById('kata-sandi');
 const tombol = document.getElementById('masuk');
 const pesan = document.getElementById('pesan-login');
 
-if (sesiAktif()) {
-  location.replace(tujuan);
-} else {
-  tombol.disabled = false;
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (tombol.disabled) return;
-    tombol.disabled = true;
-    pesan.hidden = true;
-
-    try {
-      if (await masuk(nama.value, sandi.value)) {
-        location.replace(tujuan);
-        return;
-      }
-      pesan.textContent = 'Username atau password salah.';
-    } catch (error) {
-      pesan.textContent = error.name === 'SecurityError'
-        ? 'Browser tidak mengizinkan penyimpanan sesi.'
-        : error.message;
-    }
-
-    pesan.hidden = false;
-    sandi.value = '';
-    sandi.focus();
+async function periksa() {
+  if (!(await sesiAktif())) {
     tombol.disabled = false;
-  });
+    return;
+  }
+  location.replace(tujuan);
 }
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (tombol.disabled) return;
+  tombol.disabled = true;
+  pesan.hidden = true;
+
+  try {
+    if (await masuk(nama.value, sandi.value)) {
+      location.replace(tujuan);
+      return;
+    }
+    pesan.textContent = 'Username atau password salah.';
+  } catch (error) {
+    pesan.textContent =
+      error?.status === 429
+        ? error.message
+        : error?.status === 0
+          ? 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.'
+          : error?.message || 'Gagal masuk.';
+  }
+
+  pesan.hidden = false;
+  sandi.value = '';
+  sandi.focus();
+  tombol.disabled = false;
+});
+
+periksa().catch(() => {
+  tombol.disabled = false;
+});

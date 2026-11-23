@@ -12,6 +12,7 @@ const state = {
   table: null,
   mode: 'tambah',
   editId: null,
+  editVersi: 0,
   cbPetugas: null,
   timerCari: null,
 };
@@ -248,10 +249,10 @@ function isiComboboxPetugas(idTerpilih = null, cadangan = '') {
 function isiSaranPekerjaan() {
   const daftar = el('daftar-pekerjaan');
   if (!daftar) return;
-  const saran = (state.meta?.nama_kegiatan || []).map((item) => item.nama);
+  const saran = state.meta?.nama_kegiatan || [];
   daftar.innerHTML = [...new Set(saran)]
-    .sort((a, b) => a.localeCompare(b, 'id'))
-    .map((nama) => `<option value="${escapeHtml(nama)}"></option>`)
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id'))
+    .map((item) => `<option value="${escapeHtml(item.nama)}"></option>`)
     .join('');
 }
 
@@ -317,8 +318,11 @@ function validasiForm() {
   }
 
   const namaPekerjaan = el('f-nama-pekerjaan').value.trim();
-  if (namaPekerjaan.length > 255) {
-    errorField('nama_pekerjaan', 'Nama pekerjaan/kegiatan maksimal 255 karakter.');
+  const kegiatan = (state.meta?.nama_kegiatan || []).find(
+    (item) => item.nama.trim().toLowerCase() === namaPekerjaan.toLowerCase()
+  );
+  if (namaPekerjaan && !kegiatan) {
+    errorField('nama_pekerjaan', 'Pilih nama kegiatan dari daftar yang tersedia.');
     valid = false;
   }
 
@@ -360,7 +364,7 @@ function validasiForm() {
 
   const payload = {
     jenis_kegiatan_id: jenisId,
-    nama_pekerjaan: namaPekerjaan,
+    nama_kegiatan_id: kegiatan ? Number(kegiatan.id) : null,
     bulan,
     tahun,
     honor,
@@ -582,6 +586,7 @@ function bukaModal(row = null) {
 
   state.mode = row ? 'ubah' : 'tambah';
   state.editId = row ? Number(row.id) : null;
+  state.editVersi = row ? Number(row.versi) || 0 : 0;
 
   el('judul-modal-penugasan').textContent = row ? 'Ubah Penugasan' : 'Tambah Penugasan';
   el('simpan-modal').textContent = row ? 'Simpan Perubahan' : 'Simpan Penugasan';
@@ -638,9 +643,13 @@ async function simpan(event) {
   tombol.textContent = 'Menyimpan…';
 
   try {
+    const payloadUbah =
+      state.mode === 'ubah' && state.editVersi > 0
+        ? { ...payload, versi: state.editVersi }
+        : payload;
     const hasil =
       state.mode === 'ubah'
-        ? await api.ubahPenugasan(state.editId, payload)
+        ? await api.ubahPenugasan(state.editId, payloadUbah)
         : await api.buatPenugasan(payload);
 
     const tahunBaru = Number(hasil.data?.tahun || payload.tahun);
@@ -768,16 +777,18 @@ el('btn-tambah').addEventListener('click', () => bukaModal());
 el('form-penugasan').addEventListener('submit', simpan);
 el('tutup-modal').addEventListener('click', tutupModal);
 el('batal-modal').addEventListener('click', tutupModal);
-el('f-petugas').addEventListener('change', () => {
-  el('f-petugas').dispatchEvent(new Event('input'));
-});
-el('f-petugas').addEventListener('input', () => {
+function bersihkanErrorPetugas() {
   const field = document.querySelector('#form-penugasan .field[data-field="petugas_id"]');
   if (field?.classList.contains('has-error')) {
     field.classList.remove('has-error');
     field.querySelector('.field-error').textContent = '';
   }
-});
+}
+
+// Jangan memicu event "input" dari sini: handler input combobox akan
+// mengosongkan petugas_id yang baru dipilih.
+el('f-petugas').addEventListener('change', bersihkanErrorPetugas);
+el('f-petugas').addEventListener('input', bersihkanErrorPetugas);
 el('f-honor').addEventListener('input', () => {
   const digit = el('f-honor').value.replace(/\D/g, '');
   el('f-honor').value = digit ? formatAngka(Number(digit)) : '';

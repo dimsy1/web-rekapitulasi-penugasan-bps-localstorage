@@ -1,7 +1,6 @@
 import { api } from './api.js';
 import { escapeHtml } from './format.js';
 import { keluar, periksaSesi } from './sesi.js';
-import { bacaDataset, pantauPerubahanLintasTab } from './store/penyimpanan.js';
 
 const IKON = {
   dashboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>`,
@@ -31,14 +30,19 @@ const NAV = [
 const KUNCI_TAHUN = 'tahunAktif';
 
 export function bacaTahunAktif() {
-  const sekarang = new Date().getFullYear();
+  const tersimpan = bacaTahunTersimpan();
+  return tersimpan ?? new Date().getFullYear();
+}
+
+/** Tahun yang pernah dipilih pengguna, atau null bila belum pernah. */
+export function bacaTahunTersimpan() {
   try {
     const tersimpan = Number(localStorage.getItem(KUNCI_TAHUN));
     if (Number.isInteger(tersimpan) && tersimpan >= 2020) return tersimpan;
   } catch {
     /* localStorage tidak tersedia */
   }
-  return sekarang;
+  return null;
 }
 
 function simpanTahun(tahun) {
@@ -81,11 +85,15 @@ function renderSidebar(aktif) {
     </div>`;
 }
 
-function opsiTahun(tahun) {
-  const data = bacaDataset();
-  const set = new Set(data.penugasan.map((baris) => baris.tahun));
-  if (data.tahunAnalisis) set.add(data.tahunAnalisis);
-  if (set.size === 0) return [];
+let metaTerakhir = null;
+
+function opsiTahun(tahun, meta = metaTerakhir) {
+  const set = new Set();
+  for (const nilai of meta?.tahun_tersedia || []) {
+    const angka = Number(nilai);
+    if (Number.isInteger(angka)) set.add(angka);
+  }
+  if (meta?.tahun !== undefined && meta.tahun !== null) set.add(Number(meta.tahun));
   set.add(Number(tahun));
   set.add(new Date().getFullYear());
   return [...set]
@@ -107,9 +115,6 @@ function renderTopbar({ judul, deskripsi }) {
       <p class="topbar-subtitle">${escapeHtml(deskripsi || '')}</p>
     </div>
     <div class="topbar-actions">
-      <span class="data-chip" title="Data hanya tersimpan di browser ini">
-        <span class="data-chip-dot" aria-hidden="true"></span>Data lokal
-      </span>
       <label class="year-picker" for="pilih-tahun">
         <span>Tahun</span>
         <select id="pilih-tahun" aria-label="Pilih tahun aktif"></select>
@@ -174,38 +179,73 @@ export function setTahunGlobal(tahun) {
   document.dispatchEvent(new CustomEvent('tahun-berubah', { detail: { tahun: angka } }));
 }
 
+function segarkanHalaman() {
+  const tahun = bacaTahunAktif();
+  sinkronTahun(tahun);
+  document.dispatchEvent(new CustomEvent('tahun-berubah', { detail: { tahun } }));
+}
+
+function segarkanTahunDariMeta() {
+  const terapkan = (meta) => {
+    metaTerakhir = meta;
+    sinkronTahun(bacaTahunAktif());
+  };
+  try {
+    const hasil = api.getMeta(bacaTahunAktif());
+    if (hasil && typeof hasil.then === 'function') {
+      hasil.then(terapkan).catch(() => {
+        /* biarkan pilihan tahun apa adanya bila meta gagal dimuat */
+      });
+    } else {
+      terapkan(hasil);
+    }
+  } catch {
+    /* biarkan pilihan tahun apa adanya bila meta gagal dimuat */
+  }
+}
+
 export async function initLayout({ active, judul, deskripsi }) {
-  if (!periksaSesi()) {
+  if (!(await periksaSesi())) {
     // Hentikan bootstrap halaman sampai navigasi ke login selesai.
     return new Promise(() => {});
   }
-  window.addEventListener('pageshow', periksaSesi);
+  window.addEventListener('pageshow', () => {
+    periksaSesi().then((masuk) => {
+      if (!masuk) return;
+      segarkanTahunDariMeta();
+      segarkanHalaman();
+    });
+  });
   renderSidebar(active);
-  const tahun = bacaTahunAktif();
-  simpanTahun(tahun);
+  let tahun = bacaTahunAktif();
+  const tahunDipilih = bacaTahunTersimpan() !== null;
 
   let meta = null;
   let error = null;
   try {
     meta = await api.getMeta(tahun);
+    if (!tahunDipilih && Number(meta?.tahun_analisis) >= 2020) {
+      tahun = Number(meta.tahun_analisis);
+    }
+    metaTerakhir = meta;
   } catch (kesalahan) {
     error = kesalahan;
   }
 
+  simpanTahun(tahun);
   renderTopbar({ judul, deskripsi });
   sinkronTahun(tahun);
   pasangMenuMobile();
   document.getElementById('keluar')?.addEventListener('click', keluar);
   document.body.hidden = false;
 
-  window.addEventListener('data-berubah', () => sinkronTahun(bacaTahunAktif()));
-  pantauPerubahanLintasTab(() => {
-    const tahunAktif = bacaTahunAktif();
-    sinkronTahun(tahunAktif);
-    document.dispatchEvent(
-      new CustomEvent('tahun-berubah', { detail: { tahun: tahunAktif } })
-    );
-    toast('Data diperbarui dari tab lain.', 'info');
+  window.addEventListener('data-berubah', () => {
+    segarkanTahunDariMeta();
+  });
+  api.pantauSumber?.(() => {
+    segarkanTahunDariMeta();
+    segarkanHalaman();
+    toast('Data diperbarui karena ada perubahan dari admin lain.', 'info');
   });
 
   const pilih = document.getElementById('pilih-tahun');

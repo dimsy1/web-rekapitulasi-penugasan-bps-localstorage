@@ -43,3 +43,6 @@ backup-dashboard-honor-*.json
 # Skrip pemeriksa template sementara (dipakai saat mengembangkan template)
 tests/lihat-*.mjs
 tests/periksa-*.mjs
+
+# Rahasia deployment: diisi di server lewat FTP, jangan pernah di-commit.
+api/config.php

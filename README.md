@@ -1,11 +1,31 @@
-# Dashboard Honor & Penugasan Petugas — Versi Statis
+# Dashboard Honor & Penugasan Petugas — PHP + MySQL
 
-Versi ini berjalan **tanpa server dan tanpa database**. Seluruh data disimpan di
-`localStorage` browser, lalu dapat diimpor dari file Excel dan diekspor kembali ke
-Excel. Cocok di-hosting gratis sebagai situs statis (Vercel, Netlify, GitHub Pages).
+Aplikasi web untuk mencatat penugasan petugas BPS beserta honornya, menghitung
+rekap bulanan/jenis di browser, dan bertukar data lewat file Excel. Data disimpan
+di **database MySQL** melalui API PHP, sehingga semua admin melihat data yang sama
+dari perangkat mana pun.
 
-> Data hanya tersimpan di browser yang dipakai. Data tidak otomatis tersinkron
-> antar perangkat atau antar pengguna.
+- **Database lokal**: MySQL Laragon, database `db_selaras`.
+- **Login**: username + password, sesi disimpan di server (cookie `HttpOnly`).
+- **Rekap** tidak disimpan di database; selalu dihitung ulang dari daftar penugasan.
+- **Mode lokal** (`?mode=lokal`) masih tersedia untuk demo tanpa PHP dan dipakai
+  oleh `npm test`.
+
+> Fokus proyek saat ini adalah pengembangan lokal dengan Laragon.
+
+## Arsitektur singkat
+
+```
+Browser (public/)  ──fetch JSON──▶  PHP /api/api.php  ──PDO──▶  MySQL
+    │                                     │
+    └── rekap & dashboard dihitung        └── validasi, sesi, log aktivitas
+        di browser dari dataset
+```
+
+Satu kali per halaman, browser mengambil seluruh dataset lewat `aksi=bootstrap`,
+lalu semua perhitungan memakai `public/js/store/komputasi.js`. Setiap perubahan
+dikirim per baris ke API dan API mengembalikan dataset terbaru, sehingga dua admin
+tidak saling menimpa tanpa terlihat.
 
 ## Halaman
 
@@ -29,15 +49,65 @@ belum punya penugasan, sehingga tampilannya sama dengan kolom A sheet rekap Exce
 
 ## Menjalankan secara lokal
 
+### Uji otomatis (tanpa server)
+
 ```bash
 npm install
+npm test
+```
+
+Uji memakai adapter **lokal** (`localStorage`) sehingga tidak butuh PHP/MySQL.
+
+### Menjalankan aplikasi lokal dengan database
+
+```bash
 npm run dev
 ```
 
-Buka <http://localhost:3000>.
+Buka <http://127.0.0.1:8000/>. Perintah ini otomatis menyiapkan database
+`db_selaras`, mengimpor skema jika diperlukan, lalu menjalankan PHP router.
+Pastikan MySQL Laragon aktif.
 
-Folder `public/` juga bisa disajikan oleh web server statis apa pun. Aplikasi
-memakai ES module dan path absolut (`/css`, `/js`), jadi sajikan dari akar situs.
+Mode server adalah default pada browser lokal. `?mode=lokal` masih tersedia bila
+ingin menguji penyimpanan browser secara terpisah. Jika hanya ingin menyajikan
+frontend statis tanpa PHP, gunakan `npm run dev:static` dan buka port 3000.
+
+Konfigurasi lokal pada `api/config.php` memakai host `127.0.0.1`, database
+`db_selaras`, user `root`, dan password kosong (pengaturan standar Laragon).
+Jika instalasi Laragon Anda memakai password, ubah `db_pass` di file tersebut.
+
+Saat mode server aktif, aplikasi tidak memakai `localStorage` untuk dataset,
+penugasan, petugas, jenis kegiatan, backup, atau template. Sisa data dari mode
+lokal akan dihapus otomatis dari browser; sumber data aktif adalah MySQL
+`db_selaras`.
+
+Folder `public/` memakai ES module dan path absolut (`/css`, `/js`), jadi harus
+disajikan dari akar situs.
+
+## Login dan akun admin
+
+- Saat pertama kali dijalankan, aplikasi membuat akun lokal `admin` dengan
+  password awal `admin12345`.
+- Menambah admin baru:
+
+  ```bash
+  npm run admin
+  ```
+
+  Isi username dan password (minimal 8 karakter). Bisa juga langsung:
+
+  ```bash
+  php tools/tambah-admin.php username password123
+  ```
+
+  Akun baru langsung aktif dan tercatat di tabel `admin`.
+- Username harus unik; password disimpan sebagai hash `password_hash` (bcrypt)
+  dan diverifikasi dengan `password_verify`.
+- Sesi berupa token acak 32 byte; yang disimpan di database hanya hash SHA-256-nya,
+  dan browser memegangnya lewat cookie `HttpOnly` + `SameSite=Lax` (Secure saat HTTPS).
+- Percobaan login dibatasi 8 kali per 15 menit per IP/username.
+- Setiap perubahan data dicatat di tabel `log` dan bisa dilihat di halaman
+  **Data & Excel** pada panel **Admin & log aktivitas**.
 
 ## Alur pemakaian
 
@@ -54,9 +124,10 @@ dibuat saat namanya diketik.
 2. Pilih atau seret satu atau beberapa file `.xlsx` ke area impor.
 3. Periksa pratinjau (jumlah petugas, jenis, tahun analisis B3, total honor, baris
    bermasalah, dan catatan bila ada nama yang tidak konsisten).
-4. Klik **Gabungkan Data** untuk menambahkan hasil impor ke data yang sudah tersimpan.
-5. Setelah itu semua perubahan di web tersimpan otomatis di browser.
-6. Untuk arsip atau pindah perangkat: **Unduh Sesuai Template Excel**.
+4. Klik **Impor Data** untuk menambahkan hasil impor ke database.
+5. Setelah itu semua perubahan di web langsung tersimpan di database dan terlihat
+   oleh admin lain (muat ulang otomatis saat tab kembali aktif).
+6. Untuk arsip: **Unduh sesuai template Excel**.
 
 Nama petugas dan jenis kegiatan yang sama berbagi satu entri, dengan mengabaikan
 kapitalisasi dan perbedaan spasi. Setiap baris penugasan ditambahkan, termasuk
@@ -187,62 +258,64 @@ diisi nama petugas di kolom A sheet rekap lalu diimpor kembali.
 > `public/js/data.js` bila suatu saat diperlukan. Untuk arsip, gunakan
 > **Unduh Sesuai Template Excel**.
 
-## Deploy ke Vercel
-
-1. Push repositori ini ke GitHub.
-2. Di Vercel: **Add New → Project**, pilih repositori.
-3. Framework Preset: **Other**. Root Directory: biarkan kosong.
-4. Build Command: kosongkan. Output Directory: `public`.
-5. Deploy.
-
-Atau lewat CLI:
-
-```bash
-npx vercel --prod
-```
-
 ## Penyimpanan & keamanan
 
-- Kunci `localStorage`: `dashboard-honor-v2`.
-- Backup otomatis sebelum impor/pemulihan: `dashboard-honor-v2-backup`.
-- Cetakan ekspor (file template terakhir yang diimpor): `dashboard-honor-v2-template`.
-- Data hilang jika data situs dibersihkan, mode Incognito ditutup, atau browser
-  berganti profil. Lakukan ekspor/backup berkala.
-- Tidak ada login. Siapa pun yang membuka browser tersebut dapat melihat datanya.
-- Kapasitas `localStorage` umumnya sekitar 5 MB — cukup untuk ribuan baris.
+- Tabel utama: `admin`, `sesi`, `petugas`, `jenis_kegiatan`, `penugasan`, `meta`,
+  `log`, `template_ekspor`, `login_gagal`.
+- Template Excel tersimpan di `template_ekspor.isi` (`LONGBLOB`, maksimal 4 MB).
+  Bila belum ada template tersimpan, dipakai `public/data/template-matriks.xlsx`.
+- `api/config.php` berisi kata sandi database dan **tidak boleh di-commit**
+  (sudah masuk `.gitignore`). Berkas itu juga diblokir dari akses web lewat
+  `.htaccess`.
+- Rekap/dashboard tidak disimpan; hanya penugasan, master, dan template yang
+  tersimpan di MySQL.
+- Backup database dapat dilakukan dari HeidiSQL/phpMyAdmin Laragon.
 
 ## Struktur proyek
 
 ```
+api/
+  api.php            # router JSON (semua aksi: masuk, bootstrap, CRUD, impor, ...)
+  bootstrap.php      # koneksi PDO, sesi, validasi, helper JSON
+  config.contoh.php  # contoh konfigurasi; salin menjadi config.php
+  config.php         # TIDAK di-commit (kata sandi database)
+  skema.sql          # skema MySQL untuk phpMyAdmin
+  buat-admin.php     # pembuat akun sekali pakai (hapus setelah dipakai)
+  .htaccess          # blokir config/bootstrap/skema/log
 public/
-  index.html, penugasan.html, rekap-*.html,
+  index.html, login.html, penugasan.html, rekap-*.html,
   petugas.html, master-jenis.html, data.html
+  .htaccess          # HTTPS + header keamanan
   css/style.css
   js/
-    api.js             # adapter data (bentuk respons sama dengan API lama)
-    store/
-      penyimpanan.js   # localStorage, backup, normalisasi, file template
-      pivot.js         # perhitungan rekap
-      excel.js         # impor/ekspor Excel (ExcelJS)
-      saran-pekerjaan.js  # daftar saran nama kegiatan bawaan
+    api.js             # memilih adapter server/lokal
+    sesi.js, login.js  # login lewat API, redirect, logout
     layout.js, format.js, bulan.js
     dashboard.js, penugasan.js, rekap-*.js,
     petugas.js, master-jenis.js, data.js
+    store/
+      server.js        # adapter fetch ke /api/api.php
+      lokal.js         # adapter localStorage (uji/demo)
+      validasi.js      # aturan validasi bersama
+      komputasi.js     # dashboard & rekap dari dataset
+      penyimpanan.js   # localStorage, normalisasi, template lokal
+      pivot.js         # matriks rekap
+      excel.js         # impor/ekspor Excel (ExcelJS)
+      saran-pekerjaan.js
   vendor/exceljs.min.js
-  data/template-matriks.xlsx   # template bawaan 100 baris petugas
+  data/template-matriks.xlsx   # template bawaan
 tools/
+  setup-local.php    # menyiapkan db_selaras sebelum npm run dev
   buat-template.mjs  # membangun ulang template bawaan dari template BPS
 tests/
   smoke-test.mjs, template-test.mjs
-vercel.json
 ```
 
 ## Perbedaan dengan versi sebelumnya
 
 | Versi lama | Versi ini |
 | --- | --- |
-| Express + MySQL | Statis, tanpa server |
-| Data di database | Data di `localStorage` browser |
-| Nama kegiatan dari master 73 item | Teks bebas + autocomplete |
-| Input lewat API | Input langsung di browser |
-| Belum ada impor/ekspor Excel | Impor & ekspor `.xlsx` |
+| Data hanya di `localStorage` browser | Data di MySQL, dipakai bersama |
+| Login palsu di sisi browser | Login server + sesi cookie `HttpOnly` |
+| Satu pengguna per browser | Dua akun admin dengan log aktivitas |
+| Tidak ada cadangan terpusat | Template tersimpan di database + ekspor Excel |

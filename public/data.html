@@ -18,7 +18,7 @@
           <div class="card data-intro">
             <div>
               <h2>Ringkasan Data</h2>
-              <p>Data tersimpan di browser ini. Gunakan fitur impor untuk memasukkan data dari file Excel, dan ekspor untuk mengunduhnya kembali.</p>
+              <p id="data-mode">Data tersimpan di database. Gunakan fitur impor untuk memasukkan data dari file Excel, dan ekspor untuk mengunduhnya kembali.</p>
             </div>
             <div class="data-stats" id="data-stats">
               <div class="stat-card">
@@ -143,13 +143,29 @@
             </section>
           </div>
 
+          <section class="card data-card data-admin">
+            <div class="data-card-head">
+              <div>
+                <h3>Admin &amp; log aktivitas</h3>
+                <p>
+                  Masuk sebagai <strong id="admin-nama">—</strong>.
+                  Setiap perubahan data tercatat di log.
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary" id="btn-log">Muat log</button>
+            </div>
+            <div id="log-panel" hidden>
+              <div id="log-list"></div>
+            </div>
+          </section>
+
           <p class="data-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5h.01"></path>
             </svg>
             <span>
-              Data hanya tersimpan di perangkat dan browser ini. Unduh file Excel secara berkala agar data tidak hilang.
+              Data tersimpan di database MySQL. Unduh file Excel secara berkala sebagai cadangan agar data tidak hilang.
             </span>
           </p>
         </section>

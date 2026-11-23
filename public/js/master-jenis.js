@@ -8,6 +8,7 @@ const state = {
   data: [],
   cari: '',
   editId: null,
+  editVersi: 0,
   tahun: null,
   muatToken: 0,
 };
@@ -133,6 +134,7 @@ function bukaModal(row = null) {
   bersihkanError();
 
   state.editId = row ? Number(row.id) : null;
+  state.editVersi = row ? Number(row.versi) || 0 : 0;
   el('judul-modal-jenis').textContent = row ? 'Ubah Jenis Kegiatan' : 'Tambah Jenis Kegiatan';
   el('simpan-jenis').textContent = row ? 'Simpan Perubahan' : 'Simpan';
 
@@ -178,9 +180,13 @@ async function simpan(event) {
   tombol.textContent = 'Menyimpan…';
 
   try {
+    const payloadUbah =
+      state.editId !== null && state.editVersi > 0
+        ? { ...payload, versi: state.editVersi }
+        : payload;
     const hasil =
       state.editId !== null
-        ? await api.ubahJenisKegiatan(state.editId, payload)
+        ? await api.ubahJenisKegiatan(state.editId, payloadUbah)
         : await api.buatJenisKegiatan(payload);
 
     tutupModal();

@@ -2039,27 +2039,55 @@ table.dataTable thead .sorting_asc::before {
 /* --------------------------------------------------------------------------
    Data & Excel
    -------------------------------------------------------------------------- */
-.data-chip {
-  display: inline-flex;
-  align-items: center;
+.log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
   gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-  box-shadow: var(--shadow-sm);
 }
 
-.data-chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--teal);
-  box-shadow: 0 0 0 3px var(--teal-soft);
+.log-list li {
+  display: grid;
+  grid-template-columns: 140px minmax(120px, 0.5fr) minmax(0, 1.4fr) 120px;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfdff;
+  font-size: 12px;
+}
+
+.log-waktu {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.log-aksi {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.log-isi {
+  color: var(--ink-soft, var(--muted));
+  overflow-wrap: anywhere;
+}
+
+.log-admin {
+  text-align: right;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .log-list li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .log-admin {
+    text-align: left;
+  }
 }
 
 .data-intro {

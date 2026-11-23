@@ -5,8 +5,10 @@
   "description": "Dashboard Honor & Penugasan Petugas BPS — versi statis dengan penyimpanan lokal dan impor/ekspor Excel",
   "type": "module",
   "scripts": {
-    "dev": "serve public -l 3000",
-    "start": "serve public -l 3000",
+    "dev": "php tools/setup-local.php && php -S 127.0.0.1:8000 tools/router.php",
+    "start": "php tools/setup-local.php && php -S 127.0.0.1:8000 tools/router.php",
+    "dev:static": "serve public -l 3000",
+    "admin": "php tools/tambah-admin.php",
     "test": "node tests/smoke-test.mjs && node tests/template-test.mjs"
   },
   "engines": {

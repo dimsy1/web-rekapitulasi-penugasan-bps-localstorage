@@ -9,6 +9,17 @@ export const KUNCI_BACKUP = 'dashboard-honor-v2-backup';
 export const KUNCI_TEMPLATE = 'dashboard-honor-v2-template';
 export const VERSI_DATA = 2;
 
+/** Hapus seluruh data aplikasi yang pernah disimpan oleh mode lokal. */
+export function hapusDataLokal() {
+  try {
+    localStorage.removeItem(KUNCI_DATA);
+    localStorage.removeItem(KUNCI_BACKUP);
+    localStorage.removeItem(KUNCI_TEMPLATE);
+  } catch {
+    /* abaikan bila localStorage tidak tersedia */
+  }
+}
+
 /**
  * Daftar jenis kegiatan TIDAK diisi bawaan. Sesuai alur kerja, daftar jenis
  * berasal dari file Excel pengguna (sheet `Referensi` / `Rekap Jenis Kegiatan`)
@@ -42,6 +53,12 @@ function angkaId(nilai) {
   return Number.isInteger(angka) && angka > 0 ? angka : null;
 }
 
+/** Versi baris (dipakai untuk mendeteksi perubahan oleh admin lain). */
+function angkaVersi(nilai) {
+  const angka = Number(nilai);
+  return Number.isInteger(angka) && angka > 0 ? angka : 0;
+}
+
 /** Rapikan dataset dari localStorage/backup agar bentuknya selalu konsisten. */
 export function normalisasiDataset(mentah) {
   const data = mentah && typeof mentah === 'object' ? mentah : {};
@@ -63,6 +80,7 @@ export function normalisasiDataset(mentah) {
       id,
       nama,
       urutan: Number.isFinite(Number(baris.urutan)) ? Number(baris.urutan) : hasil.jenis.length + 1,
+      versi: angkaVersi(baris.versi),
     });
   }
   hasil.jenis = urutkanJenis(hasil.jenis);
@@ -79,6 +97,7 @@ export function normalisasiDataset(mentah) {
       id: angkaId(baris.id) || hasil.petugas.length + 1,
       nama,
       urutan: Number.isInteger(urutan) && urutan > 0 ? urutan : hasil.petugas.length + 1,
+      versi: angkaVersi(baris.versi),
     });
   }
   hasil.petugas = urutkanPetugas(hasil.petugas);
@@ -90,8 +109,12 @@ export function normalisasiDataset(mentah) {
     // bulan/honor kosong) tetap disimpan agar bisa dilengkapi di web.
     if (!petugasId) continue;
 
-    const tahun = Number(baris?.tahun);
-    if (!Number.isInteger(tahun) || tahun < 2020) continue;
+    const tahunMentah = baris?.tahun;
+    let tahun = null;
+    if (tahunMentah !== undefined && tahunMentah !== null && tahunMentah !== '') {
+      tahun = Number(tahunMentah);
+      if (!Number.isInteger(tahun) || tahun < 2020) continue;
+    }
 
     let bulan = null;
     if (baris?.bulan !== undefined && baris.bulan !== null && baris.bulan !== '') {
@@ -115,6 +138,7 @@ export function normalisasiDataset(mentah) {
       bulan,
       tahun,
       honor,
+      versi: angkaVersi(baris.versi),
     });
   }
 

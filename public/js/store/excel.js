@@ -532,16 +532,20 @@ function bangunDataset(
 }
 
 export function ringkasanDataset(dataset) {
-  const tahun = [...new Set(dataset.penugasan.map((baris) => Number(baris.tahun)))].sort(
-    (a, b) => b - a
-  );
+  const tahun = [
+    ...new Set(
+      dataset.penugasan
+        .map((baris) => Number(baris.tahun))
+        .filter((nilai) => Number.isInteger(nilai) && nilai >= 2020)
+    ),
+  ].sort((a, b) => b - a);
   return {
     jumlahBaris: dataset.penugasan.length,
     jumlahPetugas: dataset.petugas.length,
     jumlahJenis: dataset.jenis.length,
     jumlahBelumLengkap: dataset.penugasan.filter((baris) => kolomKosong(baris).length > 0).length,
     tahun,
-    totalHonor: dataset.penugasan.reduce((total, baris) => total + Number(baris.honor), 0),
+    totalHonor: dataset.penugasan.reduce((total, baris) => total + (Number(baris.honor) || 0), 0),
   };
 }
 

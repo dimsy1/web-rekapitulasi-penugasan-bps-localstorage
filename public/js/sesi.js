@@ -1,13 +1,25 @@
-const KUNCI_SESI = 'dashboard-honor-v2-sesi';
-const KUNCI_TUJUAN = 'dashboard-honor-v2-tujuan-login';
+/**
+ * Sesi login. Token disimpan server (cookie HttpOnly), jadi JavaScript tidak
+ * pernah memegang token. Pemeriksaan sesi dilakukan lewat API.
+ */
+
+import { api } from './api.js';
+
+const KUNCI_TUJUAN = 'dashboard-honor-tujuan-login';
 const HALAMAN_LOGIN = '/login.html';
-const PENGGUNA = 'Ampuh3519';
-const SANDI_SHA256 = '995066a4e033dafffb757ea2f85ab2576e5b759651472f38485cfb1e410ff79c';
 
 const HALAMAN_APLIKASI = new Set([
-  '/', '/index', '/penugasan', '/rekap-bulanan', '/rekap-jenis',
-  '/petugas', '/master-jenis', '/data',
+  '/',
+  '/index',
+  '/penugasan',
+  '/rekap-bulanan',
+  '/rekap-jenis',
+  '/petugas',
+  '/master-jenis',
+  '/data',
 ]);
+
+let admin = null;
 
 export function tujuanLogin() {
   try {
@@ -21,41 +33,65 @@ export function tujuanLogin() {
   return '/';
 }
 
-export function sesiAktif() {
+export function adminAktif() {
+  return admin;
+}
+
+/** True bila server menyatakan sesi masih berlaku. */
+export async function sesiAktif() {
   try {
-    return sessionStorage.getItem(KUNCI_SESI) === PENGGUNA;
+    const sesi = await api.getSesi();
+    if (sesi?.masuk) {
+      admin = sesi.admin;
+      return true;
+    }
   } catch {
-    return false;
+    /* diperlakukan sebagai belum masuk */
   }
+  return false;
 }
 
-/** Pemeriksaan lokal untuk akses melalui antarmuka situs statis. */
-export async function masuk(nama, sandi) {
-  if (nama.trim() !== PENGGUNA) return false;
-  if (!globalThis.crypto?.subtle) throw new Error('Buka situs melalui HTTPS atau localhost untuk masuk.');
-  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sandi));
-  const hex = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  if (hex !== SANDI_SHA256) return false;
+/** Periksa sesi ke server; arahkan ke halaman login bila belum masuk. */
+export async function periksaSesi() {
+  try {
+    const sesi = await api.getSesi();
+    if (sesi?.masuk) {
+      admin = sesi.admin;
+      return true;
+    }
+  } catch {
+    // Jaringan bermasalah: biarkan halaman login menampilkan pesan.
+  }
 
-  sessionStorage.setItem(KUNCI_SESI, PENGGUNA);
-  return true;
-}
-
-export function periksaSesi() {
-  if (sesiAktif()) return true;
   document.body.hidden = true;
   try {
     sessionStorage.setItem(KUNCI_TUJUAN, location.pathname);
   } catch {
-    // Halaman login tetap bisa menampilkan pesan saat penyimpanan diblokir.
+    // Halaman login tetap bisa ditampilkan.
   }
   location.replace(HALAMAN_LOGIN);
   return false;
 }
 
-export function keluar() {
-  sessionStorage.removeItem(KUNCI_SESI);
-  sessionStorage.removeItem(KUNCI_TUJUAN);
+/** Masuk memakai username + password. Melempar ApiError bila gagal. */
+export async function masuk(nama, sandi) {
+  const hasil = await api.login(nama, sandi);
+  admin = hasil?.admin || null;
+  try {
+    sessionStorage.removeItem(KUNCI_TUJUAN);
+  } catch {
+    /* abaikan */
+  }
+  return true;
+}
+
+export async function keluar() {
+  try {
+    await api.logout();
+  } catch {
+    /* tetap lanjut ke halaman login */
+  }
+  admin = null;
   document.body.hidden = true;
   location.replace(HALAMAN_LOGIN);
 }

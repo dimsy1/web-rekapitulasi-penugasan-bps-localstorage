@@ -1058,6 +1058,42 @@ td.num {
   z-index: 6;
 }
 
+.table-rekap thead tr:first-child th {
+  height: 38px;
+}
+
+.table-rekap thead tr.baris-sub th {
+  top: 38px;
+  background: #f2f7fd;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.table-rekap thead th.grup-jenis {
+  text-align: center;
+  background: #e4effb;
+  border-left: 1px solid #d3e3f3;
+  color: #2c4c6d;
+  font-size: 11.5px;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-rekap thead th.sub-posisi {
+  border-left: 1px solid #e2ecf7;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-rekap thead th.sub-posisi.tanpa-posisi {
+  color: #8a99ab;
+  font-style: italic;
+}
+
 .table-rekap .col-nama {
   position: sticky;
   left: 0;
@@ -1165,6 +1201,138 @@ td.num {
 .locked-note svg {
   width: 13px;
   height: 13px;
+}
+
+/* Posisi petugas: chip di tabel dan baris di formulir */
+.posisi-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.posisi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 9px;
+  border: 1px solid #dbe6f2;
+  border-radius: 999px;
+  background: #f4f9ff;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.posisi-chip-nama {
+  color: #2f4a66;
+  font-weight: 650;
+}
+
+.posisi-chip-limit {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e3f4ee;
+  color: #0a756b;
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.posisi-chip-limit.kosong {
+  background: var(--amber-soft);
+  color: #a36a02;
+}
+
+.posisi-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.posisi-head label {
+  margin: 0;
+}
+
+.posisi-form-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.posisi-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.posisi-form-row.has-error {
+  border-color: #e08a8a;
+  background: #fffafa;
+}
+
+.posisi-form-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.posisi-form-main .f-posisi-nama {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.posisi-form-limit {
+  flex: 0 0 148px;
+}
+
+.posisi-form-limit input {
+  text-align: right;
+}
+
+.posisi-form-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.posisi-kosong {
+  margin-bottom: 9px;
+  padding: 9px 11px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: #8597ab;
+  font-size: 11.5px;
+}
+
+@media (max-width: 640px) {
+  .posisi-form-row {
+    flex-wrap: wrap;
+  }
+
+  .posisi-form-main {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+
+  .posisi-form-limit {
+    flex: 1 1 120px;
+  }
+
+  .posisi-form-meta {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1428,6 +1596,11 @@ body.modal-terbuka {
   margin-top: 4px;
   color: #8597ab;
   font-size: 10.5px;
+}
+
+.field-hint.warn {
+  color: #a36a02;
+  font-weight: 600;
 }
 
 .field-error {

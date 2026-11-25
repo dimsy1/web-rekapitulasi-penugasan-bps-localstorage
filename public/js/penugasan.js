@@ -246,6 +246,91 @@ function isiComboboxPetugas(idTerpilih = null, cadangan = '') {
   else state.cbPetugas.clear();
 }
 
+/* -------------------------------------------------------------------------
+   Posisi petugas & limit honor
+   ------------------------------------------------------------------------- */
+function posisiUntukJenis(jenisId) {
+  const angka = Number(jenisId);
+  if (!Number.isInteger(angka) || angka <= 0) return [];
+  return (state.meta?.posisi || [])
+    .filter((baris) => Number(baris.jenis_kegiatan_id) === angka)
+    .sort((a, b) => Number(a.urutan) - Number(b.urutan) || Number(a.id) - Number(b.id));
+}
+
+/** Limit honor posisi pada tahun tertentu; null berarti belum diatur. */
+function limitUntukPosisi(posisiId, tahun) {
+  const baris = (state.meta?.posisi_limit || []).find(
+    (item) => Number(item.posisi_id) === Number(posisiId) && Number(item.tahun) === Number(tahun)
+  );
+  return baris ? Number(baris.limit_honor) : null;
+}
+
+function perbaruiHintLimit() {
+  const hint = el('hint-limit');
+  if (!hint) return;
+  const posisiId = el('f-posisi').value;
+  const tahun = Number(el('f-tahun').value);
+
+  if (!posisiId || !Number.isInteger(tahun) || tahun < 2020) {
+    hint.hidden = true;
+    hint.textContent = '';
+    hint.classList.remove('warn');
+    return;
+  }
+
+  const limit = limitUntukPosisi(posisiId, tahun);
+  hint.hidden = false;
+  hint.classList.toggle('warn', limit === null);
+  hint.innerHTML =
+    limit === null
+      ? `Limit honor tahun ${tahun} belum diatur. Atur dulu di <a href="/master-jenis">Daftar Jenis Kegiatan</a> sebelum menyimpan.`
+      : `Limit honor tahun ${tahun}: <strong>${formatRupiah(limit)}</strong> per penugasan.`;
+}
+
+function isiSelectPosisi(jenisId = null, idTerpilih = null, cadangan = '') {
+  const select = el('f-posisi');
+  const hint = el('hint-posisi');
+  const daftar = posisiUntukJenis(jenisId);
+
+  if (!jenisId) {
+    select.disabled = true;
+    select.innerHTML = '<option value="">— Pilih jenis kegiatan dulu —</option>';
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent = 'Pilih jenis kegiatan untuk menampilkan posisi petugas.';
+    }
+  } else if (daftar.length === 0) {
+    select.disabled = true;
+    select.innerHTML = '<option value="">— Jenis ini belum punya posisi —</option>';
+    if (hint) {
+      hint.hidden = false;
+      hint.innerHTML =
+        'Jenis ini belum punya posisi petugas. Tambahkan dulu di <a href="/master-jenis">Daftar Jenis Kegiatan</a>.';
+    }
+  } else {
+    select.disabled = false;
+    select.innerHTML =
+      '<option value="">— Pilih posisi —</option>' +
+      daftar
+        .map((posisi) => `<option value="${posisi.id}">${escapeHtml(posisi.nama)}</option>`)
+        .join('');
+
+    if (idTerpilih && !daftar.some((posisi) => Number(posisi.id) === Number(idTerpilih)) && cadangan) {
+      const opsi = document.createElement('option');
+      opsi.value = String(idTerpilih);
+      opsi.textContent = cadangan;
+      select.appendChild(opsi);
+    }
+    select.value = idTerpilih ? String(idTerpilih) : '';
+    if (hint) {
+      hint.hidden = true;
+      hint.textContent = '';
+    }
+  }
+
+  perbaruiHintLimit();
+}
+
 function isiSaranPekerjaan() {
   const daftar = el('daftar-pekerjaan');
   if (!daftar) return;
@@ -317,6 +402,20 @@ function validasiForm() {
     valid = false;
   }
 
+  // Posisi wajib dipilih bila jenis kegiatan diisi, dan harus milik jenis itu.
+  const posisiMentah = el('f-posisi').value;
+  const posisiId = posisiMentah ? Number(posisiMentah) : null;
+  if (jenisId !== null && posisiId === null) {
+    errorField('posisi_id', 'Posisi petugas wajib dipilih bila jenis kegiatan diisi.');
+    valid = false;
+  } else if (posisiId !== null) {
+    const posisi = (state.meta?.posisi || []).find((baris) => Number(baris.id) === posisiId);
+    if (!posisi || Number(posisi.jenis_kegiatan_id) !== jenisId) {
+      errorField('posisi_id', 'Posisi petugas tidak sesuai dengan jenis kegiatan.');
+      valid = false;
+    }
+  }
+
   const namaPekerjaan = el('f-nama-pekerjaan').value.trim();
   const kegiatan = (state.meta?.nama_kegiatan || []).find(
     (item) => item.nama.trim().toLowerCase() === namaPekerjaan.toLowerCase()
@@ -353,6 +452,26 @@ function validasiForm() {
     }
   }
 
+  // Limit honor per posisi dan tahun wajib sudah diatur sebelum honor diisi.
+  if (posisiId !== null && honor !== null && Number.isInteger(tahun) && tahun >= 2020) {
+    const limit = limitUntukPosisi(posisiId, tahun);
+    const namaPosisi =
+      (state.meta?.posisi || []).find((baris) => Number(baris.id) === posisiId)?.nama || 'ini';
+    if (limit === null) {
+      errorField(
+        'honor',
+        `Limit honor posisi ${namaPosisi} untuk tahun ${tahun} belum diatur. Atur dulu di halaman Daftar Jenis Kegiatan.`
+      );
+      valid = false;
+    } else if (honor > limit) {
+      errorField(
+        'honor',
+        `Honor melebihi limit posisi ${namaPosisi} (${formatRupiah(limit)}) untuk tahun ${tahun}.`
+      );
+      valid = false;
+    }
+  }
+
   if (!valid) {
     document
       .querySelector(
@@ -364,6 +483,7 @@ function validasiForm() {
 
   const payload = {
     jenis_kegiatan_id: jenisId,
+    posisi_id: posisiId,
     nama_kegiatan_id: kegiatan ? Number(kegiatan.id) : null,
     bulan,
     tahun,
@@ -397,6 +517,11 @@ function badgeBelumDiisi() {
 
 function jenisHtml(row) {
   return row.jenis_nama ? escapeHtml(row.jenis_nama) : badgeBelumDiisi();
+}
+
+function posisiHtml(row) {
+  if (!row.jenis_kegiatan_id) return '<span class="cell-muted">—</span>';
+  return row.posisi_nama ? escapeHtml(row.posisi_nama) : badgeBelumDiisi();
 }
 
 function honorHtml(row) {
@@ -433,6 +558,7 @@ function barisFallback(row, indeks) {
     <td><span class="cell-primary">${escapeHtml(row.nama_petugas)}</span></td>
     <td>${jenisHtml(row)}</td>
     <td>${pekerjaanHtml(row)}</td>
+    <td>${posisiHtml(row)}</td>
     <td>${namaBulan(row.bulan)}</td>
     <td>${row.tahun}</td>
     <td class="num">${honorHtml(row)}</td>
@@ -470,6 +596,11 @@ function initTabel() {
       {
         data: null,
         render: (data, type, row) => pekerjaanHtml(row),
+      },
+      {
+        data: 'posisi_nama',
+        render: (data, type, row) =>
+          type === 'sort' || type === 'type' ? row.posisi_nama || '' : posisiHtml(row),
       },
       {
         data: 'bulan',
@@ -537,7 +668,7 @@ function renderTabel() {
   if (!tbody) return;
   tbody.innerHTML = state.rows.length
     ? state.rows.map(barisFallback).join('')
-    : '<tr><td colspan="9"><div class="dt-empty">Belum ada penugasan untuk filter ini.</div></td></tr>';
+    : '<tr><td colspan="10"><div class="dt-empty">Belum ada penugasan untuk filter ini.</div></td></tr>';
 }
 
 function setMemuat(aktif) {
@@ -604,6 +735,12 @@ function bukaModal(row = null) {
 
   el('f-tahun').value = String(row?.tahun || state.tahun);
   el('f-honor').value = row ? formatInputHonor(row.honor) : '';
+
+  isiSelectPosisi(
+    row?.jenis_kegiatan_id || null,
+    row?.posisi_id || null,
+    row?.posisi_nama || ''
+  );
 
   modal.showModal();
   document.body.classList.add('modal-terbuka');
@@ -793,6 +930,15 @@ el('f-honor').addEventListener('input', () => {
   const digit = el('f-honor').value.replace(/\D/g, '');
   el('f-honor').value = digit ? formatAngka(Number(digit)) : '';
 });
+
+el('f-jenis').addEventListener('change', () => {
+  const jenisId = el('f-jenis').value ? Number(el('f-jenis').value) : null;
+  isiSelectPosisi(jenisId);
+});
+
+el('f-posisi').addEventListener('change', perbaruiHintLimit);
+el('f-tahun').addEventListener('input', perbaruiHintLimit);
+el('f-tahun').addEventListener('change', perbaruiHintLimit);
 
 const modal = el('modal-penugasan');
 modal.addEventListener('click', (event) => {

@@ -7,7 +7,7 @@
 export const KUNCI_DATA = 'dashboard-honor-v2';
 export const KUNCI_BACKUP = 'dashboard-honor-v2-backup';
 export const KUNCI_TEMPLATE = 'dashboard-honor-v2-template';
-export const VERSI_DATA = 2;
+export const VERSI_DATA = 3;
 
 /** Hapus seluruh data aplikasi yang pernah disimpan oleh mode lokal. */
 export function hapusDataLokal() {
@@ -31,6 +31,8 @@ export function datasetKosong() {
     versi: VERSI_DATA,
     diperbarui: null,
     jenis: [],
+    posisi: [],
+    posisiLimit: [],
     petugas: [],
     penugasan: [],
   };
@@ -85,6 +87,41 @@ export function normalisasiDataset(mentah) {
   }
   hasil.jenis = urutkanJenis(hasil.jenis);
 
+  const posisiTerpakai = new Set();
+  for (const baris of Array.isArray(data.posisi) ? data.posisi : []) {
+    const jenisId = angkaId(baris?.jenis_kegiatan_id);
+    const nama = typeof baris?.nama === 'string' ? rapikanTeks(baris.nama) : '';
+    if (!jenisId || !nama) continue;
+    if (!hasil.jenis.some((item) => item.id === jenisId)) continue;
+    const kunci = `${jenisId}:${nama.toLowerCase()}`;
+    if (posisiTerpakai.has(kunci)) continue;
+    posisiTerpakai.add(kunci);
+    hasil.posisi.push({
+      id: angkaId(baris.id) || hasil.posisi.length + 1,
+      jenis_kegiatan_id: jenisId,
+      nama,
+      urutan: Number.isFinite(Number(baris.urutan))
+        ? Number(baris.urutan)
+        : hasil.posisi.length + 1,
+    });
+  }
+  hasil.posisi = urutkanPosisi(hasil.posisi);
+
+  const idPosisi = new Set(hasil.posisi.map((baris) => baris.id));
+  const limitTerpakai = new Set();
+  for (const baris of Array.isArray(data.posisiLimit) ? data.posisiLimit : []) {
+    const posisiId = angkaId(baris?.posisi_id);
+    const tahun = Number(baris?.tahun);
+    const limit = Number(baris?.limit_honor);
+    if (!posisiId || !idPosisi.has(posisiId)) continue;
+    if (!Number.isInteger(tahun) || tahun < 2020) continue;
+    if (!Number.isSafeInteger(limit) || limit < 0) continue;
+    const kunci = `${posisiId}:${tahun}`;
+    if (limitTerpakai.has(kunci)) continue;
+    limitTerpakai.add(kunci);
+    hasil.posisiLimit.push({ posisi_id: posisiId, tahun, limit_honor: limit });
+  }
+
   const petugasTerpakai = new Set();
   for (const baris of Array.isArray(data.petugas) ? data.petugas : []) {
     const nama = typeof baris?.nama === 'string' ? rapikanTeks(baris.nama) : '';
@@ -133,6 +170,7 @@ export function normalisasiDataset(mentah) {
       id: angkaId(baris.id) || idPenugasan,
       petugas_id: petugasId,
       jenis_kegiatan_id: angkaId(baris?.jenis_kegiatan_id),
+      posisi_id: angkaId(baris?.posisi_id),
       nama_pekerjaan:
         typeof baris?.nama_pekerjaan === 'string' ? rapikanTeks(baris.nama_pekerjaan) : '',
       bulan,
@@ -142,23 +180,36 @@ export function normalisasiDataset(mentah) {
     });
   }
 
-  // Pastikan relasi petugas/jenis menunjuk ke master yang ada. Jenis yang tidak
-  // ditemukan dikosongkan (baris tetap ada agar bisa diperbaiki), bukan dibuang.
+  // Pastikan relasi petugas/jenis/posisi menunjuk ke master yang ada. Relasi
+  // yang tidak ditemukan dikosongkan (baris tetap ada agar bisa diperbaiki),
+  // bukan dibuang.
   const idPetugas = new Set(hasil.petugas.map((baris) => baris.id));
   const idJenis = new Set(hasil.jenis.map((baris) => baris.id));
+  const jenisPosisi = new Map(
+    hasil.posisi.map((baris) => [baris.id, baris.jenis_kegiatan_id])
+  );
   hasil.penugasan = hasil.penugasan
     .filter((baris) => idPetugas.has(baris.petugas_id))
-    .map((baris) =>
-      baris.jenis_kegiatan_id !== null && !idJenis.has(baris.jenis_kegiatan_id)
-        ? { ...baris, jenis_kegiatan_id: null }
-        : baris
-    );
+    .map((baris) => {
+      const jenisId =
+        baris.jenis_kegiatan_id !== null && !idJenis.has(baris.jenis_kegiatan_id)
+          ? null
+          : baris.jenis_kegiatan_id;
+      let posisiId = baris.posisi_id;
+      if (posisiId !== null && (jenisId === null || jenisPosisi.get(posisiId) !== jenisId)) {
+        posisiId = null;
+      }
+      return posisiId === baris.posisi_id && jenisId === baris.jenis_kegiatan_id
+        ? baris
+        : { ...baris, jenis_kegiatan_id: jenisId, posisi_id: posisiId };
+    });
 
   return hasil;
 }
 
 const LABEL_KOLOM_KOSONG = {
   jenis: 'jenis kegiatan',
+  posisi: 'posisi petugas',
   pekerjaan: 'nama pekerjaan',
   bulan: 'bulan',
   honor: 'honor',
@@ -169,6 +220,13 @@ export function kolomKosong(baris) {
   const kosong = [];
   if (baris?.jenis_kegiatan_id === null || baris?.jenis_kegiatan_id === undefined) {
     kosong.push('jenis');
+  }
+  if (
+    baris?.jenis_kegiatan_id !== null &&
+    baris?.jenis_kegiatan_id !== undefined &&
+    (baris?.posisi_id === null || baris?.posisi_id === undefined)
+  ) {
+    kosong.push('posisi');
   }
   if (!rapikanTeks(baris?.nama_pekerjaan)) kosong.push('pekerjaan');
   const bulan = Number(baris?.bulan);
@@ -199,6 +257,37 @@ export function urutkanJenis(daftar) {
   return daftar
     .slice()
     .sort((a, b) => Number(a.urutan) - Number(b.urutan) || Number(a.id) - Number(b.id));
+}
+
+/** Urutkan posisi: per jenis, lalu urutan dan id. */
+export function urutkanPosisi(daftar) {
+  return daftar
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(a.jenis_kegiatan_id) - Number(b.jenis_kegiatan_id) ||
+        Number(a.urutan) - Number(b.urutan) ||
+        Number(a.id) - Number(b.id)
+    );
+}
+
+/** Posisi milik satu jenis kegiatan, sudah terurut. */
+export function posisiUntukJenis(dataset, jenisId) {
+  const angka = Number(jenisId);
+  if (!Number.isInteger(angka)) return [];
+  return urutkanPosisi(
+    (dataset?.posisi || []).filter((baris) => Number(baris.jenis_kegiatan_id) === angka)
+  );
+}
+
+/** Limit honor posisi pada tahun tertentu; null berarti belum diatur. */
+export function limitPosisi(dataset, posisiId, tahun) {
+  const angkaPosisi = Number(posisiId);
+  const angkaTahun = Number(tahun);
+  const baris = (dataset?.posisiLimit || []).find(
+    (item) => Number(item.posisi_id) === angkaPosisi && Number(item.tahun) === angkaTahun
+  );
+  return baris ? Number(baris.limit_honor) : null;
 }
 
 /**
@@ -317,6 +406,8 @@ export function gabungkanDataset(dataLama, sumberImpor) {
         id: idPenugasan++,
         petugas_id: petugas.get(baris.petugas_id),
         jenis_kegiatan_id: jenis.get(baris.jenis_kegiatan_id) ?? null,
+        // Impor Excel tidak membawa posisi; baris masuk ke subkolom "Tanpa posisi".
+        posisi_id: null,
       });
     }
   }

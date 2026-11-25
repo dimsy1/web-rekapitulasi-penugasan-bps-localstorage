@@ -27,6 +27,7 @@ function tampilkanKosong(judul, pesan) {
 
 function render(data) {
   const kolom = data.kolom || [];
+  const grup = data.grup || [];
   const totalLebar = LEBAR_NAMA + kolom.length * LEBAR_JENIS + LEBAR_TOTAL;
 
   el('colgroup-rekap').innerHTML = [
@@ -35,10 +36,31 @@ function render(data) {
     `<col style="width:${LEBAR_TOTAL}px">`,
   ].join('');
 
+  const barisGrup = grup
+    .map(
+      (g) =>
+        `<th class="num grup-jenis" colspan="${g.kolom.length}" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}</th>`
+    )
+    .join('');
+
+  const barisSub = grup
+    .map((g) =>
+      g.kolom
+        .map(
+          (k) =>
+            `<th class="num sub-posisi${k.tanpa_posisi ? ' tanpa-posisi' : ''}" title="${escapeHtml(k.label)}">${escapeHtml(k.label)}</th>`
+        )
+        .join('')
+    )
+    .join('');
+
   el('thead-rekap').innerHTML = `<tr>
-    <th class="col-nama">Nama Petugas</th>
-    ${kolom.map((k) => `<th class="num">${escapeHtml(k.label)}</th>`).join('')}
-    <th class="num total-col">Total Honor</th>
+    <th class="col-nama" rowspan="2">Nama Petugas</th>
+    ${barisGrup}
+    <th class="num total-col" rowspan="2">Total Honor</th>
+  </tr>
+  <tr class="baris-sub">
+    ${barisSub}
   </tr>`;
 
   const baris = (data.baris || [])

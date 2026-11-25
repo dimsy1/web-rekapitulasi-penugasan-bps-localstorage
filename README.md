@@ -37,15 +37,43 @@ tidak saling menimpa tanpa terlihat.
 4. **Rekap per Jenis Kegiatan** — matriks petugas × jenis kegiatan.
 5. **Daftar Petugas** — kelola nama petugas (tambah, ubah, hapus). Urutan baris
    mengikuti file Excel yang diimpor, dan petugas baru otomatis masuk di akhir.
-6. **Daftar Jenis Kegiatan** — kelola jenis kegiatan. Daftar ini **kosong** pada
+6. **Daftar Jenis Kegiatan** — kelola jenis kegiatan beserta **posisi petugas**
+   dan **limit honor per tahun** untuk setiap posisi. Daftar ini **kosong** pada
    pemakaian pertama dan terisi dari file Excel yang diimpor (sheet `Referensi`,
-   atau judul kolom sheet `Rekap Jenis Kegiatan` bila Referensi kosong). Jenis juga
-   bisa ditambah/diubah manual di halaman ini.
+   atau judul kolom sheet `Rekap Jenis Kegiatan` bila Referensi kosong). Jenis dan
+   posisi juga bisa ditambah/diubah manual di halaman ini.
 7. **Data & Excel** — impor Excel, ekspor Excel, unduh template kosong, reset data.
 
 Rekap tidak pernah disimpan. Semua angka dihitung ulang dari daftar penugasan
 setiap kali halaman dimuat. Semua petugas master ikut ditampilkan, termasuk yang
 belum punya penugasan, sehingga tampilannya sama dengan kolom A sheet rekap Excel.
+
+## Posisi petugas & limit honor
+
+Setiap jenis kegiatan bisa punya beberapa **posisi petugas** (misalnya PPL, PML,
+pengolah data). Aturannya:
+
+- Satu posisi milik satu jenis kegiatan. Nama posisi unik di dalam jenisnya.
+- Setiap posisi punya **limit honor per tahun anggaran**, diisi manual di halaman
+  **Daftar Jenis Kegiatan**. Limit boleh berbeda antar tahun dan tidak ada tombol
+  salin dari tahun sebelumnya.
+- Saat menambah/mengubah penugasan, **posisi wajib dipilih** begitu jenis kegiatan
+  dipilih. Posisi hanya boleh kosong bila jenis kegiatan juga kosong (baris belum
+  lengkap).
+- **Limit berlaku per baris penugasan**, bukan akumulasi bulanan/tahunan. Honor
+  satu baris tidak boleh melebihi limit posisi pada tahun baris tersebut.
+- Bila limit posisi untuk tahun itu belum diatur, penugasan tidak bisa disimpan;
+  pesan kesalahan menunjuk ke halaman **Daftar Jenis Kegiatan**.
+- Posisi yang sudah dipakai penugasan tidak bisa dihapus (sama seperti jenis dan
+  petugas). Ubah namanya bila hanya perlu koreksi.
+- Penugasan lama atau hasil impor Excel tidak punya posisi. Baris seperti ini tetap
+  dihitung dan tampil di subkolom **Tanpa posisi** pada **Rekap per Jenis
+  Kegiatan**, sampai posisinya diisi lewat halaman **Daftar Penugasan**.
+- Rekap per Jenis Kegiatan sekarang berkelompok per jenis, dengan subkolom tiap
+  posisi ditambah **Tanpa posisi**. Baris bawah menampilkan total setiap posisi
+  sekaligus total keseluruhan.
+- Impor/ekspor Excel **belum** memuat posisi: impor menambahkan baris tanpa posisi,
+  dan ekspor tetap menggabungkan honor per jenis kegiatan.
 
 ## Menjalankan secara lokal
 
@@ -125,8 +153,8 @@ Ada dua cara memulai:
 
 **Mulai dari nol (data diisi lewat web)** — daftar jenis kegiatan masih kosong.
 Tambahkan jenis lebih dulu di halaman **Daftar Jenis Kegiatan** (atau impor file
-Excel), lalu isi penugasan di halaman **Daftar Penugasan**. Petugas baru otomatis
-dibuat saat namanya diketik.
+Excel), lengkapi posisi petugas dan limit honor tahun aktif, lalu isi penugasan di
+halaman **Daftar Penugasan**. Petugas baru otomatis dibuat saat namanya diketik.
 
 **Mulai dari file Excel yang sudah ada**
 
@@ -138,6 +166,11 @@ dibuat saat namanya diketik.
 5. Setelah itu semua perubahan di web langsung tersimpan di database dan terlihat
    oleh admin lain (muat ulang otomatis saat tab kembali aktif).
 6. Untuk arsip: **Unduh sesuai template Excel**.
+
+Baris hasil impor belum punya posisi petugas. Sebelum menyimpan ulang, lengkapi
+posisinya di halaman **Daftar Penugasan** (atau biarkan tampil di subkolom
+**Tanpa posisi** pada rekap). Limit honor posisi juga perlu diatur di halaman
+**Daftar Jenis Kegiatan** untuk tahun yang dipakai.
 
 Nama petugas dan jenis kegiatan yang sama berbagi satu entri, dengan mengabaikan
 kapitalisasi dan perbedaan spasi. Setiap baris penugasan ditambahkan, termasuk
@@ -270,8 +303,8 @@ diisi nama petugas di kolom A sheet rekap lalu diimpor kembali.
 
 ## Penyimpanan & keamanan
 
-- Tabel utama: `admin`, `sesi`, `petugas`, `jenis_kegiatan`, `penugasan`, `meta`,
-  `log`, `template_ekspor`, `login_gagal`.
+- Tabel utama: `admin`, `sesi`, `petugas`, `jenis_kegiatan`, `posisi_petugas`,
+  `posisi_limit`, `penugasan`, `meta`, `log`, `template_ekspor`, `login_gagal`.
 - Template Excel tersimpan di `template_ekspor.isi` (`LONGBLOB`, maksimal 4 MB).
   Bila belum ada template tersimpan, dipakai `public/data/template-matriks.xlsx`.
 - `api/config.php` berisi kata sandi database dan **tidak boleh di-commit**
@@ -298,6 +331,7 @@ api/
   config.contoh.php  # contoh konfigurasi; salin menjadi config.php
   config.php         # TIDAK di-commit (kata sandi database)
   skema.sql          # skema MySQL untuk phpMyAdmin
+  migrasi-posisi-petugas.sql  # migrasi database lama (posisi + limit honor)
   buat-admin.php     # pembuat akun sekali pakai (hapus setelah dipakai)
   .htaccess          # blokir config/bootstrap/skema/log
 public/

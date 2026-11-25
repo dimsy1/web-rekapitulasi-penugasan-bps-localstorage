@@ -111,6 +111,33 @@ async function uji() {
   assert.equal(bacaDataset().penugasan.length, 5);
   console.log('OK simpan ke localStorage tiruan');
 
+  // --- Posisi petugas + limit honor per tahun ------------------------------
+  const jenisSurveiId = hasil.data.jenis.find((baris) => baris.nama === 'Survei').id;
+  api.ubahJenisKegiatan(jenisSurveiId, {
+    nama: 'Survei',
+    tahun: 2026,
+    posisi: [
+      { nama: 'PPL', limit_honor: 2000000 },
+      { nama: 'PML', limit_honor: 3000000 },
+    ],
+  });
+  const jenisSurvei = api
+    .getJenisKegiatan(2026)
+    .find((baris) => Number(baris.id) === Number(jenisSurveiId));
+  assert.equal(jenisSurvei.posisi.length, 2);
+  assert.equal(jenisSurvei.posisi[0].nama, 'PPL');
+  assert.equal(jenisSurvei.posisi[0].limit_honor, 2000000);
+  assert.equal(jenisSurvei.posisi[1].limit_honor, 3000000);
+  assert.equal(jenisSurvei.bisa_dihapus, false, 'jenis yang dipakai tidak bisa dihapus');
+  const posisiPpl = jenisSurvei.posisi[0].id;
+  const posisiPml = jenisSurvei.posisi[1].id;
+  console.log('OK posisi petugas dan limit honor tersimpan per tahun');
+
+  // Limit hanya berlaku untuk tahun yang diisi; tahun lain belum diatur.
+  const tahunLain = api.getJenisKegiatan(2027).find((b) => Number(b.id) === Number(jenisSurveiId));
+  assert.equal(tahunLain.posisi[0].limit_honor, null, 'limit tahun lain belum diatur');
+  console.log('OK limit honor berbeda per tahun');
+
   const dashboard = api.getDashboard(2026);
   assert.equal(dashboard.total_honor, 5_500_000);
   assert.equal(dashboard.jumlah_penugasan, 5);
@@ -127,24 +154,38 @@ async function uji() {
   assert.equal(rekap.total_keseluruhan, 5_500_000);
   assert.equal(rekap.baris.find((item) => item.nama === 'Budi Santoso').sel['1'], 1_500_000);
   const rekapJenis = api.getRekapJenis(2026);
-  assert.equal(rekapJenis.kolom.length, 5);
+  assert.equal(rekapJenis.grup.length, 5, 'satu grup per jenis kegiatan');
+  assert.equal(rekapJenis.kolom.length, 7, 'Survei: 2 posisi + Tanpa posisi; 4 jenis lain: Tanpa posisi');
   assert.equal(rekapJenis.total_keseluruhan, 5_500_000);
-  console.log('OK rekap bulanan dan rekap jenis');
+  const kolomTanpaSurvei = rekapJenis.kolom.find(
+    (kolom) => kolom.jenis_id === jenisSurveiId && kolom.tanpa_posisi
+  );
+  assert.ok(kolomTanpaSurvei, 'subkolom Tanpa posisi tersedia untuk baris lama');
+  assert.equal(
+    rekapJenis.total_per_kolom[kolomTanpaSurvei.key],
+    1_500_000,
+    'honor baris tanpa posisi tetap terhitung'
+  );
+  console.log('OK rekap bulanan dan rekap jenis per posisi');
 
   const dibuat = api.buatPenugasan({
     petugas_nama: 'Dewi Lestari',
-    jenis_kegiatan_id: 1,
+    jenis_kegiatan_id: jenisSurveiId,
+    posisi_id: posisiPpl,
     nama_pekerjaan: 'SURVEI BARU',
     bulan: 5,
     tahun: 2026,
     honor: 500000,
   });
   assert.equal(dibuat.data.nama_petugas, 'Dewi Lestari');
+  assert.equal(dibuat.data.posisi_nama, 'PPL');
   assert.equal(api.getPenugasan({ tahun: 2026, q: 'dewi' }).total, 1);
+  assert.equal(api.getPenugasan({ tahun: 2026, q: 'ppl' }).total, 1, 'posisi ikut dicari');
 
   const diubah = api.ubahPenugasan(dibuat.data.id, {
     petugas_nama: 'Dewi Lestari',
-    jenis_kegiatan_id: 1,
+    jenis_kegiatan_id: jenisSurveiId,
+    posisi_id: posisiPml,
     nama_pekerjaan: 'SURVEI BARU (REVISI)',
     bulan: 6,
     tahun: 2026,
@@ -152,7 +193,53 @@ async function uji() {
   });
   assert.equal(diubah.data.bulan, 6);
   assert.equal(diubah.data.honor, 600000);
-  console.log('OK tambah dan ubah penugasan');
+  assert.equal(diubah.data.posisi_nama, 'PML');
+  console.log('OK tambah dan ubah penugasan dengan posisi');
+
+  // Posisi wajib bila jenis diisi, dan honor tidak boleh melebihi limit posisi.
+  assert.throws(
+    () =>
+      api.buatPenugasan({
+        petugas_nama: 'Dewi Lestari',
+        jenis_kegiatan_id: jenisSurveiId,
+        nama_pekerjaan: 'TANPA POSISI',
+        bulan: 7,
+        tahun: 2026,
+        honor: 100000,
+      }),
+    (kesalahan) =>
+      kesalahan instanceof ApiError && String(kesalahan.errors?.posisi_id).includes('wajib')
+  );
+  assert.throws(
+    () =>
+      api.buatPenugasan({
+        petugas_nama: 'Dewi Lestari',
+        jenis_kegiatan_id: jenisSurveiId,
+        posisi_id: posisiPpl,
+        nama_pekerjaan: 'MELEBIHI LIMIT',
+        bulan: 7,
+        tahun: 2026,
+        honor: 2500000,
+      }),
+    (kesalahan) =>
+      kesalahan instanceof ApiError && String(kesalahan.errors?.honor).includes('melebihi limit')
+  );
+  assert.throws(
+    () =>
+      api.buatPenugasan({
+        petugas_nama: 'Dewi Lestari',
+        jenis_kegiatan_id: jenisSurveiId,
+        posisi_id: posisiPpl,
+        nama_pekerjaan: 'LIMIT BELUM DIATUR',
+        bulan: 7,
+        tahun: 2027,
+        honor: 100000,
+      }),
+    (kesalahan) =>
+      kesalahan instanceof ApiError &&
+      String(kesalahan.errors?.honor).includes('Daftar Jenis Kegiatan')
+  );
+  console.log('OK posisi wajib dan limit honor ditegakkan');
 
   assert.throws(
     () =>
@@ -170,14 +257,63 @@ async function uji() {
       return true;
     }
   );
-  const jenisBaru = api.buatJenisKegiatan({ nama: 'Diseminasi' });
+  const jenisBaru = api.buatJenisKegiatan({
+    nama: 'Diseminasi',
+    tahun: 2026,
+    posisi: [{ nama: 'Narasumber', limit_honor: 1000000 }],
+  });
+  assert.equal(jenisBaru.data.versi, 1);
   api.ubahJenisKegiatan(jenisBaru.data.id, { nama: 'Diseminasi Baru' });
   api.hapusJenisKegiatan(jenisBaru.data.id);
+  assert.ok(!api.getJenisKegiatan(2026).some((baris) => baris.nama === 'Diseminasi Baru'));
+
+  // Posisi yang sudah dipakai penugasan tidak boleh dihapus.
   assert.throws(
-    () => api.hapusJenisKegiatan(1),
+    () =>
+      api.ubahJenisKegiatan(jenisSurveiId, {
+        nama: 'Survei',
+        tahun: 2026,
+        posisi: [{ id: posisiPpl, nama: 'PPL', limit_honor: 2000000 }],
+      }),
+    (kesalahan) => kesalahan instanceof ApiError && kesalahan.status === 409,
+    'posisi yang dipakai penugasan tidak boleh dihapus'
+  );
+
+  // Posisi yang belum dipakai bisa dihapus dan limitnya ikut dibersihkan.
+  api.ubahJenisKegiatan(jenisSurveiId, {
+    nama: 'Survei',
+    tahun: 2026,
+    posisi: [
+      { id: posisiPpl, nama: 'PPL', limit_honor: 2000000 },
+      { id: posisiPml, nama: 'PML', limit_honor: 3000000 },
+      { nama: 'Sementara', limit_honor: 500000 },
+    ],
+  });
+  const posisiSementara = api
+    .getJenisKegiatan(2026)
+    .find((baris) => Number(baris.id) === Number(jenisSurveiId))
+    .posisi.find((baris) => baris.nama === 'Sementara');
+  assert.ok(posisiSementara, 'posisi baru tersimpan');
+  api.ubahJenisKegiatan(jenisSurveiId, {
+    nama: 'Survei',
+    tahun: 2026,
+    posisi: [
+      { id: posisiPpl, nama: 'PPL', limit_honor: 2000000 },
+      { id: posisiPml, nama: 'PML', limit_honor: 3000000 },
+    ],
+  });
+  assert.ok(
+    !api
+      .getJenisKegiatan(2026)
+      .find((baris) => Number(baris.id) === Number(jenisSurveiId))
+      .posisi.some((baris) => baris.nama === 'Sementara'),
+    'posisi tanpa pemakaian terhapus'
+  );
+  assert.throws(
+    () => api.hapusJenisKegiatan(jenisSurveiId),
     (kesalahan) => kesalahan instanceof ApiError && kesalahan.status === 409
   );
-  console.log('OK validasi dan CRUD jenis kegiatan');
+  console.log('OK validasi dan CRUD jenis kegiatan beserta posisi');
 
   api.hapusPenugasan(dibuat.data.id);
   assert.equal(bacaDataset().penugasan.length, 5);
@@ -273,6 +409,19 @@ async function uji() {
   );
 
   simpanDataset(hasilSetengah.data);
+
+  // Tambahkan posisi + limit agar baris bisa dilengkapi dan disimpan.
+  const jenisSetengahId = hasilSetengah.data.jenis[0].id;
+  api.ubahJenisKegiatan(jenisSetengahId, {
+    nama: hasilSetengah.data.jenis[0].nama,
+    tahun: 2026,
+    posisi: [{ nama: 'PPL', limit_honor: 2000000 }],
+  });
+  const posisiSetengah = api
+    .getJenisKegiatan(2026)
+    .find((baris) => Number(baris.id) === Number(jenisSetengahId))
+    .posisi[0].id;
+
   const belum = api.getPenugasan({ tahun: 2026, status: 'belum' });
   assert.equal(belum.total, 3);
   assert.equal(belum.belum_lengkap, 3);
@@ -283,7 +432,8 @@ async function uji() {
 
   const lengkapi = api.ubahPenugasan(belum.data[0].id, {
     petugas_nama: 'Ivan',
-    jenis_kegiatan_id: hasilSetengah.data.jenis[0].id,
+    jenis_kegiatan_id: jenisSetengahId,
+    posisi_id: posisiSetengah,
     nama_pekerjaan: '(SUSENAS26) SURVEI SOSIAL EKONOMI',
     bulan: 4,
     tahun: 2026,
@@ -455,7 +605,11 @@ async function uji() {
     bacaDataset().jenis.map((baris) => baris.nama),
     ['Pengumpulan Data', 'Pemeriksaan', 'Pelatihan Petugas']
   );
-  api.buatJenisKegiatan({ nama: 'Pengolahan' });
+  api.buatJenisKegiatan({
+    nama: 'Pengolahan',
+    tahun: 2027,
+    posisi: [{ nama: 'Pengolah', limit_honor: 750000 }],
+  });
   api.ubahJenisKegiatan(hasilReferensi.data.jenis[0].id, { nama: 'Pengumpulan Data (Revisi)' });
 
   const wbHasil = await buatWorkbookTemplate(bacaDataset(), {

@@ -77,17 +77,74 @@ export function buatRekapBulanan({ tahun, petugas, penugasan }) {
 }
 
 /**
+ * Rekap per jenis kegiatan dengan subkolom posisi petugas.
+ *
  * @param {object} opsi
  * @param {number} opsi.tahun
  * @param {Array<{id:number,nama:string}>} opsi.petugas
  * @param {Array<{id:number,nama:string,urutan:number}>} opsi.jenis
+ * @param {Array<{id:number,jenis_kegiatan_id:number,nama:string,urutan:number}>} opsi.posisi
  * @param {Array<object>} opsi.penugasan
  */
-export function buatRekapJenis({ tahun, petugas, jenis, penugasan }) {
-  const kolom = jenis
+export function buatRekapJenis({ tahun, petugas, jenis, posisi = [], penugasan }) {
+  const jenisUrut = jenis
     .slice()
-    .sort((a, b) => Number(a.urutan) - Number(b.urutan) || Number(a.id) - Number(b.id))
-    .map((j) => ({ key: String(j.id), label: j.nama }));
+    .sort((a, b) => Number(a.urutan) - Number(b.urutan) || Number(a.id) - Number(b.id));
+  const posisiUrut = posisi
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(a.jenis_kegiatan_id) - Number(b.jenis_kegiatan_id) ||
+        Number(a.urutan) - Number(b.urutan) ||
+        Number(a.id) - Number(b.id)
+    );
+
+  // Jenis yang masih punya baris tanpa posisi pada tahun ini mendapat
+  // subkolom khusus agar honor lama tetap terhitung.
+  const jenisTanpaPosisi = new Set();
+  for (const data of penugasan) {
+    if (Number(data.tahun) !== Number(tahun)) continue;
+    const jenisId = Number(data.jenis_kegiatan_id);
+    if (!Number.isInteger(jenisId) || jenisId <= 0) continue;
+    if (data.posisi_id === null || data.posisi_id === undefined) {
+      jenisTanpaPosisi.add(jenisId);
+    }
+  }
+
+  const kolom = [];
+  const grup = [];
+  for (const j of jenisUrut) {
+    const jenisId = Number(j.id);
+    const sub = posisiUrut
+      .filter((p) => Number(p.jenis_kegiatan_id) === jenisId)
+      .map((p) => ({
+        key: `${jenisId}-${Number(p.id)}`,
+        label: p.nama,
+        jenis_id: jenisId,
+        jenis_nama: j.nama,
+        posisi_id: Number(p.id),
+        tanpa_posisi: false,
+      }));
+
+    if (sub.length === 0 || jenisTanpaPosisi.has(jenisId)) {
+      sub.push({
+        key: `${jenisId}-tanpa`,
+        label: 'Tanpa posisi',
+        jenis_id: jenisId,
+        jenis_nama: j.nama,
+        posisi_id: null,
+        tanpa_posisi: true,
+      });
+    }
+
+    grup.push({
+      key: `jenis-${jenisId}`,
+      label: j.nama,
+      jenis_id: jenisId,
+      kolom: sub,
+    });
+    kolom.push(...sub);
+  }
 
   const baris = barisDasar(petugas, kolom);
   const peta = new Map(baris.map((item) => [item.petugas_id, item]));
@@ -96,8 +153,14 @@ export function buatRekapJenis({ tahun, petugas, jenis, penugasan }) {
     if (Number(data.tahun) !== Number(tahun)) continue;
     const target = peta.get(Number(data.petugas_id));
     if (!target) continue;
-    const key = String(data.jenis_kegiatan_id);
+
+    const jenisId = Number(data.jenis_kegiatan_id);
+    if (!Number.isInteger(jenisId) || jenisId <= 0) continue;
+    const posisiId =
+      data.posisi_id === null || data.posisi_id === undefined ? null : Number(data.posisi_id);
+    const key = posisiId === null ? `${jenisId}-tanpa` : `${jenisId}-${posisiId}`;
     if (!(key in target.sel)) continue;
+
     const honor = Number(data.honor) || 0;
     target.sel[key] += honor;
     target.total += honor;
@@ -108,6 +171,7 @@ export function buatRekapJenis({ tahun, petugas, jenis, penugasan }) {
   return {
     tahun,
     kolom,
+    grup,
     baris,
     ...hitungTotal(baris, kolom),
   };

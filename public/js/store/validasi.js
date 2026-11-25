@@ -4,7 +4,7 @@
  */
 
 import { ApiError } from './kesalahan.js';
-import { idBerikutnya, rapikanTeks } from './penyimpanan.js';
+import { idBerikutnya, limitPosisi, rapikanTeks } from './penyimpanan.js';
 
 export const TAHUN_MIN = 2020;
 export const TAHUN_MAKS = 65535;
@@ -136,6 +136,34 @@ export function jenisOpsional(ds, nilai) {
   return Number(resolveJenis(ds, nilai).id);
 }
 
+/**
+ * Posisi wajib dipilih bila jenis kegiatan diisi, dan harus milik jenis itu.
+ */
+export function resolvePosisi(ds, nilai, jenisId) {
+  if (nilai === undefined || nilai === null || nilai === '') {
+    if (jenisId !== null && jenisId !== undefined) {
+      throw new ApiError(400, 'Posisi petugas wajib dipilih.', {
+        posisi_id: 'Posisi petugas wajib dipilih bila jenis kegiatan diisi.',
+      });
+    }
+    return null;
+  }
+
+  const angka = angkaField(nilai, 'posisi_id', 'Posisi petugas', { min: 1 });
+  const posisi = (ds.posisi || []).find((baris) => Number(baris.id) === angka);
+  if (!posisi) {
+    throw new ApiError(400, 'Posisi petugas tidak ditemukan.', {
+      posisi_id: 'Posisi petugas tidak ditemukan.',
+    });
+  }
+  if (jenisId === null || Number(posisi.jenis_kegiatan_id) !== Number(jenisId)) {
+    throw new ApiError(400, 'Posisi petugas tidak sesuai jenis kegiatan.', {
+      posisi_id: 'Posisi petugas tidak sesuai dengan jenis kegiatan.',
+    });
+  }
+  return angka;
+}
+
 export function urutanPetugasBaru(ds) {
   return ds.petugas.reduce((maks, baris) => Math.max(maks, Number(baris.urutan) || 0), 0) + 1;
 }
@@ -174,12 +202,42 @@ export function validasiPayloadPenugasan(ds, body) {
     { maks: 255 }
   );
 
+  const jenisKegiatanId = jenisOpsional(ds, body.jenis_kegiatan_id);
+  const posisiId = resolvePosisi(ds, body.posisi_id, jenisKegiatanId);
+  const tahun = tahunOpsional(body.tahun);
+  const honor = honorOpsional(body.honor);
+
+  if (posisiId !== null && honor !== null && tahun !== null) {
+    const limit = limitPosisi(ds, posisiId, tahun);
+    const namaPosisi =
+      (ds.posisi || []).find((baris) => Number(baris.id) === posisiId)?.nama || 'ini';
+    if (limit === null) {
+      throw new ApiError(
+        400,
+        `Limit honor posisi ${namaPosisi} untuk tahun ${tahun} belum diatur.`,
+        {
+          honor:
+            `Limit honor posisi ${namaPosisi} untuk tahun ${tahun} belum diatur. ` +
+            'Atur dulu di halaman Daftar Jenis Kegiatan.',
+        }
+      );
+    }
+    if (honor > limit) {
+      throw new ApiError(400, 'Honor melebihi limit posisi.', {
+        honor:
+          `Honor melebihi limit posisi ${namaPosisi} (Rp${limit.toLocaleString('id-ID')}) ` +
+          `untuk tahun ${tahun}.`,
+      });
+    }
+  }
+
   return {
-    jenis_kegiatan_id: jenisOpsional(ds, body.jenis_kegiatan_id),
+    jenis_kegiatan_id: jenisKegiatanId,
+    posisi_id: posisiId,
     nama_pekerjaan: namaPekerjaan,
     bulan: bilanganOpsional(body.bulan, 'bulan', 'Bulan', { min: 1, maks: 12 }),
-    tahun: tahunOpsional(body.tahun),
-    honor: honorOpsional(body.honor),
+    tahun,
+    honor,
     petugas: resolvePetugas(ds, body),
   };
 }

@@ -296,6 +296,31 @@ function dataset_lengkap(): array
         ];
     }
 
+    $posisi = [];
+    foreach ($pdo->query(
+        'SELECT id, jenis_kegiatan_id, nama, urutan
+           FROM posisi_petugas
+          ORDER BY jenis_kegiatan_id, urutan, id'
+    )->fetchAll() as $baris) {
+        $posisi[] = [
+            'id' => (int) $baris['id'],
+            'jenis_kegiatan_id' => (int) $baris['jenis_kegiatan_id'],
+            'nama' => (string) $baris['nama'],
+            'urutan' => (int) $baris['urutan'],
+        ];
+    }
+
+    $posisiLimit = [];
+    foreach ($pdo->query(
+        'SELECT posisi_id, tahun, limit_honor FROM posisi_limit ORDER BY posisi_id, tahun'
+    )->fetchAll() as $baris) {
+        $posisiLimit[] = [
+            'posisi_id' => (int) $baris['posisi_id'],
+            'tahun' => (int) $baris['tahun'],
+            'limit_honor' => (int) $baris['limit_honor'],
+        ];
+    }
+
     $namaKegiatan = [];
     $stmtNamaKegiatan = $pdo->query(
         'SELECT id, nama, urutan FROM nama_kegiatan WHERE aktif = 1 ORDER BY urutan, id'
@@ -311,16 +336,20 @@ function dataset_lengkap(): array
     }
 
     $penugasan = [];
-    $sql = 'SELECT p.id, p.petugas_id, p.jenis_kegiatan_id, p.nama_kegiatan_id,
+    $sql = 'SELECT p.id, p.petugas_id, p.jenis_kegiatan_id, p.posisi_id,
+                   ps.nama AS posisi_nama, p.nama_kegiatan_id,
                    n.nama AS nama_kegiatan, p.bulan, p.tahun, p.honor, p.versi
               FROM penugasan p
               LEFT JOIN nama_kegiatan n ON n.id = p.nama_kegiatan_id
+              LEFT JOIN posisi_petugas ps ON ps.id = p.posisi_id
              ORDER BY (p.bulan IS NULL), p.bulan, p.id';
     foreach ($pdo->query($sql)->fetchAll() as $baris) {
         $penugasan[] = [
             'id' => (int) $baris['id'],
             'petugas_id' => (int) $baris['petugas_id'],
             'jenis_kegiatan_id' => $baris['jenis_kegiatan_id'] === null ? null : (int) $baris['jenis_kegiatan_id'],
+            'posisi_id' => $baris['posisi_id'] === null ? null : (int) $baris['posisi_id'],
+            'posisi_nama' => $baris['posisi_nama'] === null ? '' : (string) $baris['posisi_nama'],
             'nama_kegiatan_id' => $baris['nama_kegiatan_id'] === null ? null : (int) $baris['nama_kegiatan_id'],
             'nama_pekerjaan' => $baris['nama_kegiatan'] === null ? '' : (string) $baris['nama_kegiatan'],
             'bulan' => $baris['bulan'] === null ? null : (int) $baris['bulan'],
@@ -331,12 +360,14 @@ function dataset_lengkap(): array
     }
 
     return [
-        'versi' => 3,
+        'versi' => 4,
         'tahunAnalisis' => $tahun,
         'diperbarui' => isset($meta['diperbarui']) ? (string) $meta['diperbarui'] : null,
         'revisi' => isset($meta['revisi']) ? (int) $meta['revisi'] : 0,
         'petugas' => $petugas,
         'jenis' => $jenis,
+        'posisi' => $posisi,
+        'posisiLimit' => $posisiLimit,
         'namaKegiatan' => $namaKegiatan,
         'penugasan' => $penugasan,
     ];
@@ -505,4 +536,21 @@ function periksa_versi(string $tabel, int $id, $versi): void
     if ((int) $sekarang !== (int) $versi) {
         gagal(409, 'Data ini baru saja diubah admin lain. Muat ulang halaman lalu ulangi perubahan Anda.');
     }
+}
+
+/** Limit honor sebuah posisi pada tahun tertentu; null berarti belum diatur. */
+function limit_posisi(int $posisiId, int $tahun): ?int
+{
+    $stmt = db()->prepare('SELECT limit_honor FROM posisi_limit WHERE posisi_id = ? AND tahun = ?');
+    $stmt->execute([$posisiId, $tahun]);
+    $nilai = $stmt->fetchColumn();
+    return $nilai === false ? null : (int) $nilai;
+}
+
+/** Jumlah penugasan yang memakai sebuah posisi (seluruh tahun). */
+function jumlah_pemakaian_posisi(int $posisiId): int
+{
+    $stmt = db()->prepare('SELECT COUNT(*) FROM penugasan WHERE posisi_id = ?');
+    $stmt->execute([$posisiId]);
+    return (int) $stmt->fetchColumn();
 }

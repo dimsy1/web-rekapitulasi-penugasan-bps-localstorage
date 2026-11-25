@@ -257,14 +257,15 @@ try {
                 $petugasId = pastikan_petugas($data);
                 $stmt = $pdo->prepare(
                     'UPDATE penugasan
-                        SET petugas_id = ?, jenis_kegiatan_id = ?, nama_kegiatan_id = ?,
-                            bulan = ?, tahun = ?, honor = ?, versi = versi + 1,
-                            diperbarui_oleh = ?, diubah_pada = NOW()
+                        SET petugas_id = ?, jenis_kegiatan_id = ?, posisi_id = ?,
+                            nama_kegiatan_id = ?, bulan = ?, tahun = ?, honor = ?,
+                            versi = versi + 1, diperbarui_oleh = ?, diubah_pada = NOW()
                       WHERE id = ?'
                 );
                 $stmt->execute([
                     $petugasId,
                     $data['jenis_kegiatan_id'],
+                    $data['posisi_id'],
                     $data['nama_kegiatan_id'],
                     $data['bulan'],
                     $data['tahun'],
@@ -455,8 +456,18 @@ try {
             $input = masukan_json();
             $errors = [];
             $nama = teks_field($input['nama'] ?? '', 'nama', 'Nama jenis kegiatan', 100, $errors);
-            if ($errors) {
-                gagal(400, 'Nama jenis kegiatan belum valid.', $errors);
+            $tahun = tahun_opsional($input['tahun'] ?? null, $errors);
+            if ($tahun === null && !isset($errors['tahun'])) {
+                $errors['tahun'] = 'Tahun limit honor wajib diisi.';
+            }
+            $daftarPosisi = validasi_posisi_payload(
+                $input['posisi'] ?? null,
+                $tahun ?? TAHUN_MIN,
+                true,
+                $errors
+            );
+            if ($errors !== []) {
+                gagal(400, 'Data jenis kegiatan belum valid.', $errors);
             }
             if (cari_jenis_nama($nama) !== null) {
                 gagal(400, 'Nama jenis kegiatan sudah digunakan.', [
@@ -473,8 +484,14 @@ try {
                 );
                 $stmt->execute([$nama, urutan_jenis_berikutnya()]);
                 $id = (int) $pdo->lastInsertId();
+                simpan_posisi_jenis($pdo, $id, $daftarPosisi, $tahun);
                 naikkan_revisi();
-                catat_log($admin, 'jenis.buat', 'jenis#' . $id, $nama);
+                catat_log(
+                    $admin,
+                    'jenis.buat',
+                    'jenis#' . $id,
+                    $nama . ' · ' . count($daftarPosisi) . ' posisi'
+                );
                 $pdo->commit();
             } catch (Throwable $kesalahan) {
                 if ($pdo->inTransaction()) {
@@ -499,9 +516,6 @@ try {
             $id = ambil_id($input);
             $errors = [];
             $nama = teks_field($input['nama'] ?? '', 'nama', 'Nama jenis kegiatan', 100, $errors);
-            if ($errors) {
-                gagal(400, 'Nama jenis kegiatan belum valid.', $errors);
-            }
             $baris = baris_jenis($id);
             periksa_versi('jenis_kegiatan', $id, $input['versi'] ?? null);
 
@@ -512,6 +526,37 @@ try {
                 ]);
             }
 
+            $ubahPosisi = array_key_exists('posisi', $input);
+            $tahun = tahun_opsional($input['tahun'] ?? null, $errors);
+            $daftarPosisi = [];
+            if ($ubahPosisi) {
+                if ($tahun === null && !isset($errors['tahun'])) {
+                    $errors['tahun'] = 'Tahun limit honor wajib diisi.';
+                }
+                $daftarPosisi = validasi_posisi_payload(
+                    $input['posisi'],
+                    $tahun ?? TAHUN_MIN,
+                    false,
+                    $errors
+                );
+                $idPosisiMilikJenis = [];
+                $cekPosisi = db()->prepare(
+                    'SELECT id FROM posisi_petugas WHERE jenis_kegiatan_id = ?'
+                );
+                $cekPosisi->execute([$id]);
+                foreach ($cekPosisi->fetchAll() as $item) {
+                    $idPosisiMilikJenis[(int) $item['id']] = true;
+                }
+                foreach ($daftarPosisi as $item) {
+                    if ($item['id'] !== null && !isset($idPosisiMilikJenis[$item['id']])) {
+                        $errors['posisi'] = 'Ada posisi yang bukan milik jenis kegiatan ini.';
+                    }
+                }
+            }
+            if ($errors !== []) {
+                gagal(400, 'Data jenis kegiatan belum valid.', $errors);
+            }
+
             $pdo = db();
             $pdo->beginTransaction();
             try {
@@ -519,8 +564,19 @@ try {
                     'UPDATE jenis_kegiatan SET nama = ?, versi = versi + 1, diubah_pada = NOW() WHERE id = ?'
                 );
                 $stmt->execute([$nama, $id]);
+
+                $ringkasanPosisi = '';
+                if ($ubahPosisi) {
+                    $ringkasanPosisi = perbarui_posisi_jenis($pdo, $id, $daftarPosisi, $tahun);
+                }
+
                 naikkan_revisi();
-                catat_log($admin, 'jenis.ubah', 'jenis#' . $id, $baris['nama'] . ' → ' . $nama);
+                catat_log(
+                    $admin,
+                    'jenis.ubah',
+                    'jenis#' . $id,
+                    $baris['nama'] . ' → ' . $nama . $ringkasanPosisi
+                );
                 $pdo->commit();
             } catch (Throwable $kesalahan) {
                 if ($pdo->inTransaction()) {
@@ -552,6 +608,15 @@ try {
                 $cek->execute([$id]);
                 if ((int) $cek->fetchColumn() > 0) {
                     gagal(409, 'Jenis ini sudah dipakai pada data penugasan.');
+                }
+                $cekPosisi = $pdo->prepare(
+                    'SELECT COUNT(*) FROM penugasan p
+                       INNER JOIN posisi_petugas ps ON ps.id = p.posisi_id
+                      WHERE ps.jenis_kegiatan_id = ?'
+                );
+                $cekPosisi->execute([$id]);
+                if ((int) $cekPosisi->fetchColumn() > 0) {
+                    gagal(409, 'Posisi pada jenis ini masih dipakai data penugasan.');
                 }
                 $pdo->prepare('DELETE FROM jenis_kegiatan WHERE id = ?')->execute([$id]);
                 naikkan_revisi();
@@ -900,7 +965,7 @@ function ambil_id(array $input): int
 function ambil_penugasan(int $id): array
 {
     $stmt = db()->prepare(
-        'SELECT p.id, p.petugas_id, p.jenis_kegiatan_id, p.nama_kegiatan_id,
+        'SELECT p.id, p.petugas_id, p.jenis_kegiatan_id, p.posisi_id, p.nama_kegiatan_id,
                 n.nama AS nama_kegiatan, p.bulan, p.tahun, p.honor, p.versi
            FROM penugasan p LEFT JOIN nama_kegiatan n ON n.id = p.nama_kegiatan_id
           WHERE p.id = ?'
@@ -911,6 +976,181 @@ function ambil_penugasan(int $id): array
         gagal(404, 'Penugasan tidak ditemukan.');
     }
     return $baris;
+}
+
+/**
+ * Validasi daftar posisi dari payload jenis kegiatan.
+ *
+ * @return array<int,array{id:?int,nama:string,urutan:int,limit_honor:?int}>
+ */
+function validasi_posisi_payload($daftar, int $tahun, bool $wajib, array &$errors): array
+{
+    if ($daftar === null) {
+        if ($wajib) {
+            $errors['posisi'] = 'Tambahkan minimal satu posisi petugas.';
+        }
+        return [];
+    }
+    if (!is_array($daftar)) {
+        $errors['posisi'] = 'Daftar posisi petugas tidak valid.';
+        return [];
+    }
+    if ($wajib && count($daftar) === 0) {
+        $errors['posisi'] = 'Tambahkan minimal satu posisi petugas.';
+        return [];
+    }
+
+    $hasil = [];
+    $namaTerpakai = [];
+    foreach (array_values($daftar) as $indeks => $item) {
+        if (!is_array($item)) {
+            $errors['posisi'] = 'Daftar posisi petugas tidak valid.';
+            continue;
+        }
+        $nama = rapikan_teks($item['nama'] ?? '');
+        if ($nama === '') {
+            $errors['posisi'] = 'Nama posisi petugas wajib diisi.';
+            continue;
+        }
+        if (mb_strlen($nama) > 100) {
+            $errors['posisi'] = 'Nama posisi petugas maksimal 100 karakter.';
+            continue;
+        }
+        $kunci = mb_strtolower($nama);
+        if (isset($namaTerpakai[$kunci])) {
+            $errors['posisi'] = 'Nama posisi petugas tidak boleh sama dalam satu jenis kegiatan.';
+            continue;
+        }
+        $namaTerpakai[$kunci] = true;
+
+        $id = null;
+        if (isset($item['id']) && $item['id'] !== '' && $item['id'] !== null) {
+            $id = (int) $item['id'];
+            if ($id <= 0) {
+                $errors['posisi'] = 'Posisi petugas tidak valid.';
+                continue;
+            }
+        }
+
+        $adaLimit =
+            isset($item['limit_honor']) &&
+            $item['limit_honor'] !== '' &&
+            $item['limit_honor'] !== null;
+        $limit = null;
+        if ($adaLimit) {
+            $limit = bulat_opsional($item['limit_honor'], 'posisi', 'Limit honor', 0, PHP_INT_MAX, $errors);
+            if ($limit === null) {
+                continue;
+            }
+        } elseif ($wajib) {
+            $errors['posisi'] =
+                'Limit honor posisi "' . $nama . '" tahun ' . $tahun . ' wajib diisi.';
+            continue;
+        }
+
+        $hasil[] = [
+            'id' => $id,
+            'nama' => $nama,
+            'urutan' => $indeks + 1,
+            'limit_honor' => $limit,
+        ];
+    }
+
+    return $hasil;
+}
+
+function simpan_limit_posisi(PDO $pdo, int $posisiId, int $tahun, int $limit): void
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO posisi_limit (posisi_id, tahun, limit_honor, diubah_pada)
+         VALUES (?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE limit_honor = VALUES(limit_honor), diubah_pada = VALUES(diubah_pada)'
+    );
+    $stmt->execute([$posisiId, $tahun, $limit]);
+}
+
+function simpan_posisi_jenis(PDO $pdo, int $jenisId, array $daftar, int $tahun): void
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO posisi_petugas (jenis_kegiatan_id, nama, urutan, dibuat_pada, diubah_pada)
+         VALUES (?, ?, ?, NOW(), NOW())'
+    );
+    foreach ($daftar as $item) {
+        $stmt->execute([$jenisId, $item['nama'], $item['urutan']]);
+        $posisiId = (int) $pdo->lastInsertId();
+        if ($item['limit_honor'] !== null) {
+            simpan_limit_posisi($pdo, $posisiId, $tahun, $item['limit_honor']);
+        }
+    }
+}
+
+/**
+ * Sinkronkan posisi sebuah jenis dengan payload: ubah yang ada, tambah yang
+ * baru, hapus yang tidak dikirim (hanya bila belum dipakai penugasan).
+ */
+function perbarui_posisi_jenis(PDO $pdo, int $jenisId, array $daftar, int $tahun): string
+{
+    $stmtLama = $pdo->prepare('SELECT id, nama FROM posisi_petugas WHERE jenis_kegiatan_id = ?');
+    $stmtLama->execute([$jenisId]);
+    $petaLama = [];
+    foreach ($stmtLama->fetchAll() as $baris) {
+        $petaLama[(int) $baris['id']] = (string) $baris['nama'];
+    }
+
+    $dipertahankan = [];
+    foreach ($daftar as $item) {
+        if ($item['id'] !== null) {
+            $dipertahankan[$item['id']] = true;
+        }
+    }
+    foreach ($petaLama as $posisiId => $namaLama) {
+        if (isset($dipertahankan[$posisiId])) {
+            continue;
+        }
+        if (jumlah_pemakaian_posisi($posisiId) > 0) {
+            gagal(
+                409,
+                'Posisi "' . $namaLama . '" sudah dipakai pada data penugasan sehingga tidak dapat dihapus.'
+            );
+        }
+    }
+
+    $ubah = $pdo->prepare(
+        'UPDATE posisi_petugas
+            SET nama = ?, urutan = ?, diubah_pada = NOW()
+          WHERE id = ? AND jenis_kegiatan_id = ?'
+    );
+    $tambah = $pdo->prepare(
+        'INSERT INTO posisi_petugas (jenis_kegiatan_id, nama, urutan, dibuat_pada, diubah_pada)
+         VALUES (?, ?, ?, NOW(), NOW())'
+    );
+    $hapusLimit = $pdo->prepare('DELETE FROM posisi_limit WHERE posisi_id = ? AND tahun = ?');
+
+    foreach ($daftar as $item) {
+        if ($item['id'] !== null) {
+            $ubah->execute([$item['nama'], $item['urutan'], $item['id'], $jenisId]);
+            $posisiId = (int) $item['id'];
+        } else {
+            $tambah->execute([$jenisId, $item['nama'], $item['urutan']]);
+            $posisiId = (int) $pdo->lastInsertId();
+        }
+
+        if ($item['limit_honor'] === null) {
+            $hapusLimit->execute([$posisiId, $tahun]);
+        } else {
+            simpan_limit_posisi($pdo, $posisiId, $tahun, $item['limit_honor']);
+        }
+    }
+
+    $hapusPosisi = $pdo->prepare('DELETE FROM posisi_petugas WHERE id = ?');
+    foreach ($petaLama as $posisiId => $namaLama) {
+        if (isset($dipertahankan[$posisiId])) {
+            continue;
+        }
+        $hapusPosisi->execute([$posisiId]);
+    }
+
+    return ' · ' . count($daftar) . ' posisi';
 }
 
 /**
@@ -991,6 +1231,46 @@ function siapkan_data_penugasan(array $input): array
         }
     }
 
+    $posisiId = null;
+    $namaPosisi = '';
+    $adaPosisi =
+        isset($input['posisi_id']) && $input['posisi_id'] !== '' && $input['posisi_id'] !== null;
+    if ($adaPosisi) {
+        $idPosisi = (int) $input['posisi_id'];
+        if ($idPosisi <= 0) {
+            $errors['posisi_id'] = 'Posisi petugas tidak valid.';
+        } else {
+            $stmt = db()->prepare(
+                'SELECT id, jenis_kegiatan_id, nama FROM posisi_petugas WHERE id = ?'
+            );
+            $stmt->execute([$idPosisi]);
+            $barisPosisi = $stmt->fetch();
+            if ($barisPosisi === false) {
+                $errors['posisi_id'] = 'Posisi petugas tidak ditemukan.';
+            } elseif ($jenisId === null || (int) $barisPosisi['jenis_kegiatan_id'] !== $jenisId) {
+                $errors['posisi_id'] = 'Posisi petugas tidak sesuai dengan jenis kegiatan.';
+            } else {
+                $posisiId = (int) $barisPosisi['id'];
+                $namaPosisi = (string) $barisPosisi['nama'];
+            }
+        }
+    } elseif ($jenisId !== null) {
+        $errors['posisi_id'] = 'Posisi petugas wajib dipilih bila jenis kegiatan diisi.';
+    }
+
+    if ($errors === [] && $posisiId !== null && $honor !== null && $tahun !== null) {
+        $limit = limit_posisi($posisiId, $tahun);
+        if ($limit === null) {
+            $errors['honor'] =
+                'Limit honor posisi ' . $namaPosisi . ' untuk tahun ' . $tahun .
+                ' belum diatur. Atur dulu di halaman Daftar Jenis Kegiatan.';
+        } elseif ($honor > $limit) {
+            $errors['honor'] =
+                'Honor melebihi limit posisi ' . $namaPosisi . ' (Rp' .
+                number_format($limit, 0, ',', '.') . ') untuk tahun ' . $tahun . '.';
+        }
+    }
+
     if ($errors !== []) {
         gagal(400, 'Data penugasan belum valid.', $errors);
     }
@@ -999,6 +1279,7 @@ function siapkan_data_penugasan(array $input): array
         'petugas_id' => $petugasId,
         'nama_petugas' => $namaPetugas,
         'jenis_kegiatan_id' => $jenisId,
+        'posisi_id' => $posisiId,
         'nama_kegiatan_id' => $namaKegiatanId,
         'nama_pekerjaan' => '',
         'bulan' => $bulan,
@@ -1032,13 +1313,14 @@ function simpan_penugasan_baru(int $petugasId, array $data, int $adminId): int
 {
     $stmt = db()->prepare(
         'INSERT INTO penugasan
-            (petugas_id, jenis_kegiatan_id, nama_kegiatan_id, bulan, tahun, honor,
+            (petugas_id, jenis_kegiatan_id, posisi_id, nama_kegiatan_id, bulan, tahun, honor,
              versi, diperbarui_oleh, dibuat_pada, diubah_pada)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, NOW(), NOW())'
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, NOW(), NOW())'
     );
     $stmt->execute([
         $petugasId,
         $data['jenis_kegiatan_id'],
+        $data['posisi_id'],
         $data['nama_kegiatan_id'],
         $data['bulan'],
         $data['tahun'],

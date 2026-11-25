@@ -62,6 +62,34 @@ CREATE TABLE IF NOT EXISTS jenis_kegiatan (
   KEY idx_urutan (urutan)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS posisi_petugas (
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  jenis_kegiatan_id INT UNSIGNED NOT NULL,
+  nama             VARCHAR(100) NOT NULL,
+  urutan           INT UNSIGNED NOT NULL DEFAULT 0,
+  dibuat_pada      DATETIME     NOT NULL,
+  diubah_pada      DATETIME     NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY unik_jenis_nama (jenis_kegiatan_id, nama),
+  KEY idx_jenis_urutan (jenis_kegiatan_id, urutan),
+  CONSTRAINT fk_posisi_jenis FOREIGN KEY (jenis_kegiatan_id)
+    REFERENCES jenis_kegiatan (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Limit honor posisi per tahun anggaran. Tidak adanya baris berarti limit
+-- untuk tahun tersebut belum diatur, sehingga penugasan tidak bisa disimpan.
+CREATE TABLE IF NOT EXISTS posisi_limit (
+  posisi_id    INT UNSIGNED NOT NULL,
+  tahun        SMALLINT UNSIGNED NOT NULL,
+  limit_honor  BIGINT UNSIGNED NOT NULL,
+  diubah_pada  DATETIME     NOT NULL,
+  PRIMARY KEY (posisi_id, tahun),
+  KEY idx_tahun (tahun),
+  CONSTRAINT fk_limit_posisi FOREIGN KEY (posisi_id)
+    REFERENCES posisi_petugas (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT cek_limit_tahun CHECK (tahun >= 2020)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS nama_kegiatan (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nama        VARCHAR(255) NOT NULL,
@@ -78,6 +106,7 @@ CREATE TABLE IF NOT EXISTS penugasan (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   petugas_id        INT UNSIGNED NOT NULL,
   jenis_kegiatan_id INT UNSIGNED NULL,
+  posisi_id         INT UNSIGNED NULL,
   nama_kegiatan_id  INT UNSIGNED NULL,
   bulan             TINYINT UNSIGNED NULL,
   tahun             SMALLINT UNSIGNED NULL,
@@ -90,11 +119,14 @@ CREATE TABLE IF NOT EXISTS penugasan (
   KEY idx_tahun (tahun),
   KEY idx_petugas (petugas_id),
   KEY idx_jenis (jenis_kegiatan_id),
+  KEY idx_posisi (posisi_id),
   KEY idx_nama_kegiatan (nama_kegiatan_id),
   CONSTRAINT fk_penugasan_petugas FOREIGN KEY (petugas_id)
     REFERENCES petugas (id) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_penugasan_jenis FOREIGN KEY (jenis_kegiatan_id)
     REFERENCES jenis_kegiatan (id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_penugasan_posisi FOREIGN KEY (posisi_id)
+    REFERENCES posisi_petugas (id) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_penugasan_nama_kegiatan FOREIGN KEY (nama_kegiatan_id)
     REFERENCES nama_kegiatan (id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT cek_bulan CHECK (bulan IS NULL OR bulan BETWEEN 1 AND 12),

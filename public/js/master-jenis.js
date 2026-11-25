@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { initLayout, toast, konfirmasiHapus, dialogPesan } from './layout.js';
-import { escapeHtml } from './format.js';
+import { angkaDariInput, escapeHtml, formatAngka, formatRupiah } from './format.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -15,6 +15,7 @@ const state = {
 
 function bersihkanError() {
   document.querySelectorAll('#form-jenis .field').forEach((field) => field.classList.remove('has-error'));
+  document.querySelectorAll('#daftar-posisi-form .posisi-form-row').forEach((row) => row.classList.remove('has-error'));
   document.querySelectorAll('#form-jenis .field-error').forEach((pesan) => {
     pesan.textContent = '';
   });
@@ -44,11 +45,83 @@ function tampilkanError(error) {
   alert.classList.add('show');
 }
 
+/* -------------------------------------------------------------------------
+   Posisi petugas
+   ------------------------------------------------------------------------- */
+function posisiHtml(row) {
+  const daftar = Array.isArray(row.posisi) ? row.posisi : [];
+  if (daftar.length === 0) {
+    return '<span class="cell-muted">Belum ada posisi</span>';
+  }
+  return `<div class="posisi-chips">${daftar
+    .map(
+      (posisi) => `<span class="posisi-chip">
+        <span class="posisi-chip-nama">${escapeHtml(posisi.nama)}</span>
+        <span class="posisi-chip-limit${posisi.limit_honor === null ? ' kosong' : ''}">${
+          posisi.limit_honor === null ? 'Limit belum diatur' : formatRupiah(posisi.limit_honor)
+        }</span>
+      </span>`
+    )
+    .join('')}</div>`;
+}
+
+function barisPosisiHtml(item, indeks) {
+  const pemakaian = Number(item.jumlah_pemakaian_total ?? item.jumlah_pemakaian ?? 0);
+  const terkunci = item.id !== null && item.id !== undefined && item.bisa_dihapus === false;
+  return `<div class="posisi-form-row" data-id="${item.id ?? ''}">
+    <div class="posisi-form-main">
+      <input type="text" class="f-posisi-nama" maxlength="100" autocomplete="off"
+             placeholder="Nama posisi (mis. PPL)" aria-label="Nama posisi ${indeks + 1}"
+             value="${escapeHtml(item.nama || '')}">
+      <div class="input-prefix posisi-form-limit">
+        <span>Rp</span>
+        <input type="text" class="f-posisi-limit" inputmode="numeric" autocomplete="off"
+               placeholder="0" aria-label="Limit honor posisi ${indeks + 1}"
+               value="${
+                 item.limit_honor === null || item.limit_honor === undefined
+                   ? ''
+                   : formatAngka(item.limit_honor)
+               }">
+      </div>
+    </div>
+    <div class="posisi-form-meta">
+      ${pemakaian > 0 ? `<span class="usage-note">Dipakai ${formatAngka(pemakaian)} penugasan</span>` : ''}
+      <button type="button" class="btn-icon danger" data-aksi="hapus-baris-posisi"
+              title="${terkunci ? 'Posisi sudah dipakai penugasan' : 'Hapus posisi'}"
+              aria-label="Hapus posisi" ${terkunci ? 'disabled' : ''}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.8h6V7M6.5 7l.8 13h9.4l.8-13"/><path d="M10 11v5M14 11v5"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderPosisiForm(daftar = []) {
+  const wadah = el('daftar-posisi-form');
+  if (daftar.length === 0) {
+    wadah.innerHTML =
+      '<p class="posisi-kosong">Belum ada posisi. Tambahkan minimal satu posisi bila jenis ini akan dipakai pada penugasan.</p>';
+    return;
+  }
+  wadah.innerHTML = daftar.map((item, indeks) => barisPosisiHtml(item, indeks)).join('');
+}
+
+function tambahBarisPosisi(item = { id: null, nama: '', limit_honor: null }) {
+  const wadah = el('daftar-posisi-form');
+  if (wadah.querySelector('.posisi-kosong')) wadah.innerHTML = '';
+  const indeks = wadah.querySelectorAll('.posisi-form-row').length;
+  wadah.insertAdjacentHTML('beforeend', barisPosisiHtml(item, indeks));
+  wadah.lastElementChild?.querySelector('.f-posisi-nama')?.focus();
+}
+
 function render() {
   const tbody = el('tbody-jenis');
   const kueri = state.cari.trim().toLowerCase();
   const tampil = kueri
-    ? state.data.filter((row) => row.nama.toLowerCase().includes(kueri))
+    ? state.data.filter(
+        (row) =>
+          row.nama.toLowerCase().includes(kueri) ||
+          (row.posisi || []).some((posisi) => posisi.nama.toLowerCase().includes(kueri))
+      )
     : state.data;
 
   el('jumlah-jenis').textContent = kueri
@@ -60,7 +133,7 @@ function render() {
       state.data.length === 0
         ? 'Belum ada jenis kegiatan. Impor file Excel di halaman Data & Excel, atau tambahkan jenis di sini.'
         : 'Tidak ada jenis kegiatan yang cocok dengan pencarian.';
-    tbody.innerHTML = `<tr><td colspan="3"><div class="dt-empty">${pesan}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="dt-empty">${pesan}</div></td></tr>`;
     return;
   }
 
@@ -86,6 +159,7 @@ function render() {
         <td>
           <span class="cell-primary">${escapeHtml(row.nama)}</span>
         </td>
+        <td>${posisiHtml(row)}</td>
         <td>
           ${
             pemakaian > 0
@@ -140,6 +214,18 @@ function bukaModal(row = null) {
 
   el('f-nama-jenis').value = row?.nama || '';
 
+  el('tahun-limit').textContent = String(state.tahun);
+  const daftarPosisi = (Array.isArray(row?.posisi) ? row.posisi : []).map((posisi) => ({
+    id: posisi.id,
+    nama: posisi.nama,
+    limit_honor: posisi.limit_honor,
+    jumlah_pemakaian: posisi.jumlah_pemakaian,
+    jumlah_pemakaian_total: posisi.jumlah_pemakaian_total,
+    bisa_dihapus: posisi.bisa_dihapus,
+  }));
+  if (!row) daftarPosisi.push({ id: null, nama: '', limit_honor: null });
+  renderPosisiForm(daftarPosisi);
+
   modal.showModal();
   document.body.classList.add('modal-terbuka');
   setTimeout(() => el('f-nama-jenis').focus(), 40);
@@ -150,6 +236,58 @@ function tutupModal() {
   if (modal.open) modal.close();
   document.body.classList.remove('modal-terbuka');
   bersihkanError();
+}
+
+/** Baca baris posisi dari formulir; kembalikan daftar + pesan kesalahan pertama. */
+function bacaPosisiForm() {
+  const baris = [...document.querySelectorAll('#daftar-posisi-form .posisi-form-row')];
+  const daftar = [];
+  const namaTerpakai = new Set();
+
+  for (const row of baris) {
+    const nama = row.querySelector('.f-posisi-nama').value.trim();
+    const limitMentah = row.querySelector('.f-posisi-limit').value.trim();
+    const idMentah = row.dataset.id;
+    const id = idMentah ? Number(idMentah) : null;
+
+    // Baris yang benar-benar kosong (mis. baris tambahan yang tidak diisi) diabaikan.
+    if (!nama && !limitMentah) continue;
+
+    if (!nama) {
+      row.classList.add('has-error');
+      return { daftar, error: 'Nama posisi petugas wajib diisi.' };
+    }
+    if (nama.length > 100) {
+      row.classList.add('has-error');
+      return { daftar, error: 'Nama posisi petugas maksimal 100 karakter.' };
+    }
+    const kunci = nama.toLowerCase();
+    if (namaTerpakai.has(kunci)) {
+      row.classList.add('has-error');
+      return {
+        daftar,
+        error: 'Nama posisi petugas tidak boleh sama dalam satu jenis kegiatan.',
+      };
+    }
+    namaTerpakai.add(kunci);
+
+    if (!limitMentah) {
+      row.classList.add('has-error');
+      return {
+        daftar,
+        error: `Limit honor posisi “${nama}” tahun ${state.tahun} wajib diisi.`,
+      };
+    }
+    const limit = angkaDariInput(limitMentah);
+    if (limit === null) {
+      row.classList.add('has-error');
+      return { daftar, error: `Limit honor posisi “${nama}” belum valid.` };
+    }
+
+    daftar.push({ id, nama, limit_honor: limit });
+  }
+
+  return { daftar, error: '' };
 }
 
 function validasi() {
@@ -165,8 +303,17 @@ function validasi() {
     valid = false;
   }
 
+  const { daftar, error } = bacaPosisiForm();
+  if (error) {
+    errorField('posisi', error);
+    valid = false;
+  } else if (daftar.length === 0) {
+    errorField('posisi', 'Tambahkan minimal satu posisi petugas.');
+    valid = false;
+  }
+
   if (!valid) return null;
-  return { nama };
+  return { nama, tahun: state.tahun, posisi: daftar };
 }
 
 async function simpan(event) {
@@ -235,6 +382,29 @@ el('cari-jenis').addEventListener('input', () => {
   state.cari = el('cari-jenis').value;
   render();
 });
+el('btn-tambah-posisi').addEventListener('click', () => tambahBarisPosisi());
+
+el('daftar-posisi-form').addEventListener('click', (event) => {
+  const tombol = event.target.closest('button[data-aksi="hapus-baris-posisi"]');
+  if (!tombol || tombol.disabled) return;
+  const wadah = el('daftar-posisi-form');
+  tombol.closest('.posisi-form-row')?.remove();
+  if (!wadah.querySelector('.posisi-form-row')) {
+    wadah.innerHTML =
+      '<p class="posisi-kosong">Belum ada posisi. Tambahkan minimal satu posisi untuk jenis kegiatan ini.</p>';
+  }
+});
+
+el('daftar-posisi-form').addEventListener('input', (event) => {
+  const baris = event.target.closest('.posisi-form-row');
+  if (baris) baris.classList.remove('has-error');
+
+  if (event.target.classList.contains('f-posisi-limit')) {
+    const digit = event.target.value.replace(/\D/g, '');
+    event.target.value = digit ? formatAngka(Number(digit)) : '';
+  }
+});
+
 el('form-jenis').addEventListener('submit', simpan);
 el('tutup-modal-jenis').addEventListener('click', tutupModal);
 el('batal-modal-jenis').addEventListener('click', tutupModal);

@@ -59,6 +59,17 @@ try {
         );
         $pdo->exec('ALTER TABLE penugasan DROP COLUMN nama_pekerjaan');
     }
+    // Migrasikan database lokal lama ke posisi petugas (versi 3.1+).
+    if ($pdo->query("SHOW COLUMNS FROM penugasan LIKE 'posisi_id'")->fetch() === false) {
+        $pdo->exec('ALTER TABLE penugasan ADD COLUMN posisi_id INT UNSIGNED NULL AFTER jenis_kegiatan_id');
+        $pdo->exec('ALTER TABLE penugasan ADD KEY idx_posisi (posisi_id)');
+    }
+    $fkPosisi = $pdo->query("SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_penugasan_posisi'")->fetchColumn();
+    if ((int) $fkPosisi === 0) {
+        $pdo->exec('ALTER TABLE penugasan ADD CONSTRAINT fk_penugasan_posisi
+            FOREIGN KEY (posisi_id) REFERENCES posisi_petugas (id) ON DELETE RESTRICT ON UPDATE CASCADE');
+    }
     $fk = $pdo->query("SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_penugasan_nama_kegiatan'")->fetchColumn();
     if ((int) $fk === 0) {

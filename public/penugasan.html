@@ -73,6 +73,7 @@
                     <th style="width:150px">Nama Petugas</th>
                     <th style="width:155px">Jenis Kegiatan</th>
                     <th class="kolom-pekerjaan">Nama Pekerjaan/Kegiatan</th>
+                    <th style="width:130px">Posisi</th>
                     <th style="width:105px">Bulan</th>
                     <th style="width:72px">Tahun</th>
                     <th class="num" style="width:135px">Honor</th>
@@ -137,12 +138,13 @@
             <p class="field-error" data-error="jenis_kegiatan_id"></p>
           </div>
 
-          <div class="field" data-field="bulan">
-            <label for="f-bulan">Bulan <span class="opsional">(boleh kosong)</span></label>
-            <select id="f-bulan">
-              <option value="">— Belum diisi —</option>
+          <div class="field" data-field="posisi_id">
+            <label for="f-posisi">Posisi Petugas <span class="opsional">(wajib bila jenis diisi)</span></label>
+            <select id="f-posisi" disabled>
+              <option value="">— Pilih jenis kegiatan dulu —</option>
             </select>
-            <p class="field-error" data-error="bulan"></p>
+            <p class="field-hint" id="hint-posisi">Pilih jenis kegiatan untuk menampilkan posisi petugas.</p>
+            <p class="field-error" data-error="posisi_id"></p>
           </div>
 
           <div class="field full" data-field="nama_pekerjaan">
@@ -154,18 +156,27 @@
             <p class="field-error" data-error="nama_pekerjaan"></p>
           </div>
 
+          <div class="field" data-field="bulan">
+            <label for="f-bulan">Bulan <span class="opsional">(boleh kosong)</span></label>
+            <select id="f-bulan">
+              <option value="">— Belum diisi —</option>
+            </select>
+            <p class="field-error" data-error="bulan"></p>
+          </div>
+
           <div class="field" data-field="tahun">
             <label for="f-tahun">Tahun <span class="wajib">*</span></label>
             <input type="number" id="f-tahun" min="2020" step="1" inputmode="numeric" placeholder="2026">
             <p class="field-error" data-error="tahun"></p>
           </div>
 
-          <div class="field" data-field="honor">
+          <div class="field full" data-field="honor">
             <label for="f-honor">Honor <span class="opsional">(boleh kosong)</span></label>
             <div class="input-prefix">
               <span>Rp</span>
               <input type="text" id="f-honor" inputmode="numeric" autocomplete="off" placeholder="0">
             </div>
+            <p class="field-hint" id="hint-limit" hidden></p>
             <p class="field-error" data-error="honor"></p>
           </div>
         </div>

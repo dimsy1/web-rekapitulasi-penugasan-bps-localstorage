@@ -30,7 +30,7 @@
             <div class="table-card-head">
               <div>
                 <h3>Jenis Kegiatan <span class="badge" id="jumlah-jenis">0 jenis</span></h3>
-                <p>Jumlah penugasan mengikuti tahun aktif.</p>
+                <p>Jumlah penugasan dan limit honor mengikuti tahun aktif.</p>
               </div>
               <button type="button" class="btn btn-primary" id="btn-tambah-jenis">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -45,6 +45,7 @@
                 <thead>
                   <tr>
                     <th>Nama Jenis Kegiatan</th>
+                    <th style="width:260px">Posisi Petugas</th>
                     <th style="width:190px">Jumlah Penugasan</th>
                     <th style="width:170px;text-align:right">Aksi</th>
                   </tr>
@@ -60,8 +61,8 @@
               <path d="M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z"></path>
             </svg>
             <div>
-              <p style="font-size:12.5px;font-weight:650;color:#33475f">Jenis kegiatan yang sudah dipakai tidak dapat dihapus</p>
-              <p style="font-size:11.5px;color:#687b92;margin-top:1px">Jenis kegiatan yang sudah dipakai pada data penugasan tidak dapat dihapus agar data penugasan tetap utuh. Jenis lain, termasuk “Lainnya”, dapat dihapus.</p>
+              <p style="font-size:12.5px;font-weight:650;color:#33475f">Jenis dan posisi yang sudah dipakai tidak dapat dihapus</p>
+              <p style="font-size:11.5px;color:#687b92;margin-top:1px">Jenis kegiatan atau posisi petugas yang sudah dipakai pada data penugasan tidak dapat dihapus agar data penugasan tetap utuh. Limit honor diisi per tahun dan wajib diatur sebelum penugasan tahun tersebut disimpan.</p>
             </div>
           </div>
         </section>
@@ -69,12 +70,12 @@
     </div>
   </div>
 
-  <dialog id="modal-jenis" class="modal" aria-labelledby="judul-modal-jenis" style="width:min(520px,calc(100vw - 28px))">
+  <dialog id="modal-jenis" class="modal" aria-labelledby="judul-modal-jenis" style="width:min(620px,calc(100vw - 28px))">
     <form id="form-jenis" novalidate>
       <div class="modal-header">
         <div>
           <h2 id="judul-modal-jenis">Tambah Jenis Kegiatan</h2>
-          <p>Jenis kegiatan menjadi kolom pada halaman Rekap per Jenis Kegiatan.</p>
+          <p>Jenis kegiatan menjadi kolom pada halaman Rekap per Jenis Kegiatan, dan posisinya menjadi subkolom.</p>
         </div>
         <button type="button" class="icon-button" id="tutup-modal-jenis" aria-label="Tutup formulir">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -88,8 +89,23 @@
         <div class="form-grid">
           <div class="field full" data-field="nama">
             <label for="f-nama-jenis">Nama Jenis Kegiatan <span class="wajib">*</span></label>
-            <input type="text" id="f-nama-jenis" maxlength="100" autocomplete="off" placeholder="Contoh: Pengolahan Data">
+            <input type="text" id="f-nama-jenis" maxlength="100" autocomplete="off" placeholder="Contoh: Sensus">
             <p class="field-error" data-error="nama"></p>
+          </div>
+
+          <div class="field full" data-field="posisi">
+            <div class="posisi-head">
+              <label>Posisi Petugas <span class="wajib">*</span></label>
+              <span class="field-hint">Limit honor tahun <strong id="tahun-limit">—</strong></span>
+            </div>
+            <div id="daftar-posisi-form" class="posisi-form-list"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-tambah-posisi">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+              Tambah Posisi
+            </button>
+            <p class="field-error" data-error="posisi"></p>
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ return [
 
     // --- Aplikasi ----------------------------------------------------------
     'zona_waktu' => 'Asia/Jakarta',
-    'versi_app' => '3.0.0',
+    'versi_app' => '3.1.0',
 
     // Dipakai oleh pembuat akun admin lokal.
     'setup_token' => 'lokal-ganti-token',

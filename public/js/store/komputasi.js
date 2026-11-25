@@ -7,9 +7,12 @@ import { BULAN } from '../bulan.js';
 import {
   kolomKosong,
   labelKolomKosong,
+  limitPosisi,
+  posisiUntukJenis,
   rapikanTeks,
   urutkanJenis,
   urutkanPetugas,
+  urutkanPosisi,
 } from './penyimpanan.js';
 import { SARAN_PEKERJAAN } from './saran-pekerjaan.js';
 import { buatRekapBulanan, buatRekapJenis } from './pivot.js';
@@ -44,6 +47,7 @@ export function barisUntukApi(ds, baris) {
   if (!baris) return null;
   const petugas = ds.petugas.find((item) => Number(item.id) === Number(baris.petugas_id));
   const jenis = ds.jenis.find((item) => Number(item.id) === Number(baris.jenis_kegiatan_id));
+  const posisi = (ds.posisi || []).find((item) => Number(item.id) === Number(baris.posisi_id));
   const kosong = kolomKosong(baris);
   return {
     id: Number(baris.id),
@@ -54,6 +58,11 @@ export function barisUntukApi(ds, baris) {
         ? null
         : Number(baris.jenis_kegiatan_id),
     jenis_nama: jenis?.nama || '',
+    posisi_id:
+      baris.posisi_id === null || baris.posisi_id === undefined
+        ? null
+        : Number(baris.posisi_id),
+    posisi_nama: posisi?.nama || '',
     nama_kegiatan_id: null,
     kode_kegiatan: null,
     nama_pekerjaan: baris.nama_pekerjaan || '',
@@ -88,6 +97,17 @@ export function metaDataset(ds, tahun) {
       id: Number(baris.id),
       nama: baris.nama,
       urutan: Number(baris.urutan),
+    })),
+    posisi: urutkanPosisi(ds.posisi || []).map((baris) => ({
+      id: Number(baris.id),
+      jenis_kegiatan_id: Number(baris.jenis_kegiatan_id),
+      nama: baris.nama,
+      urutan: Number(baris.urutan),
+    })),
+    posisi_limit: (ds.posisiLimit || []).map((baris) => ({
+      posisi_id: Number(baris.posisi_id),
+      tahun: Number(baris.tahun),
+      limit_honor: Number(baris.limit_honor),
     })),
     petugas: urutkanPetugas(ds.petugas).map((baris) => ({
       id: Number(baris.id),
@@ -128,7 +148,10 @@ export function penugasanDataset(ds, params = {}) {
     rows = rows.filter((baris) => {
       const petugas = ds.petugas.find((item) => Number(item.id) === Number(baris.petugas_id));
       const jenis = ds.jenis.find((item) => Number(item.id) === Number(baris.jenis_kegiatan_id));
-      return [baris.nama_pekerjaan, petugas?.nama, jenis?.nama]
+      const posisi = (ds.posisi || []).find(
+        (item) => Number(item.id) === Number(baris.posisi_id)
+      );
+      return [baris.nama_pekerjaan, petugas?.nama, jenis?.nama, posisi?.nama]
         .filter(Boolean)
         .some((teks) => teks.toLowerCase().includes(cari));
     });
@@ -221,6 +244,7 @@ export function rekapJenisDataset(ds, tahun) {
     tahun: aktif,
     petugas: urutkanPetugas(ds.petugas),
     jenis: ds.jenis,
+    posisi: ds.posisi || [],
     penugasan: ds.penugasan,
   });
 }
@@ -260,6 +284,22 @@ export function jenisKegiatanDataset(ds, tahun) {
         jumlah_pemakaian: jumlahTahun,
         jumlah_pemakaian_total: dipakai.length,
         bisa_dihapus: dipakai.length === 0,
+        posisi: posisiUntukJenis(ds, jenis.id).map((posisi) => {
+          const dipakaiPosisi = ds.penugasan.filter(
+            (baris) => Number(baris.posisi_id) === Number(posisi.id)
+          );
+          return {
+            id: Number(posisi.id),
+            nama: posisi.nama,
+            urutan: Number(posisi.urutan),
+            limit_honor: limitPosisi(ds, posisi.id, aktif),
+            jumlah_pemakaian: dipakaiPosisi.filter((baris) =>
+              cocokTahun(baris.tahun, aktif)
+            ).length,
+            jumlah_pemakaian_total: dipakaiPosisi.length,
+            bisa_dihapus: dipakaiPosisi.length === 0,
+          };
+        }),
       };
     })
     .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));

@@ -139,6 +139,21 @@ disajikan dari akar situs.
   ```
 
   Atau langsung: `php tools/ganti-sandi.php username password-baru`.
+- Mengosongkan data aplikasi (penugasan, petugas, jenis kegiatan, posisi, limit
+  honor, template tersimpan, log, dan semua sesi login):
+
+  ```bash
+  npm run reset
+  ```
+
+  Skrip menampilkan jumlah baris per tabel lalu meminta Anda mengetik `HAPUS`.
+  Akun admin dan master nama kegiatan dipertahankan agar masih bisa masuk.
+  Untuk melihat rencana tanpa menghapus: `npm run reset -- --lihat`. Untuk
+  menghapus juga akun admin dan master nama kegiatan:
+  `npm run reset -- --semua` (buat ulang admin dengan `npm run admin`).
+  Menambahkan `--ya` melewati konfirmasi. Skrip ini memakai koneksi dan nama
+  database dari `api/config.php`, jadi arahkan ke database yang benar sebelum
+  dijalankan di server.
 - Username harus unik; password disimpan sebagai hash `password_hash` (bcrypt)
   dan diverifikasi dengan `password_verify`.
 - Sesi berupa token acak 32 byte; yang disimpan di database hanya hash SHA-256-nya,
@@ -366,6 +381,7 @@ public/
   data/template-matriks.xlsx   # template bawaan
 tools/
   setup-local.php    # menyiapkan db_selaras sebelum npm run dev
+  reset-data.php     # mengosongkan data aplikasi (npm run reset)
   buat-template.mjs  # membangun ulang template bawaan dari template BPS
 tests/
   smoke-test.mjs, template-test.mjs

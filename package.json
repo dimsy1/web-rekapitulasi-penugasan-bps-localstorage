@@ -10,6 +10,7 @@
     "dev:static": "serve public -l 3000",
     "admin": "php tools/tambah-admin.php",
     "sandi": "php tools/ganti-sandi.php",
+    "reset": "php tools/reset-data.php",
     "test": "node tests/smoke-test.mjs && node tests/template-test.mjs"
   },
   "engines": {

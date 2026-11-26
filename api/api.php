@@ -696,9 +696,9 @@ try {
 
                 $sisip = $pdo->prepare(
                     'INSERT INTO penugasan
-                        (petugas_id, jenis_kegiatan_id, nama_kegiatan_id, bulan, tahun, honor,
+                        (petugas_id, jenis_kegiatan_id, posisi_id, nama_kegiatan_id, bulan, tahun, honor,
                          versi, diperbarui_oleh, dibuat_pada, diubah_pada)
-                     VALUES (?, ?, ?, ?, ?, ?, 1, ?, NOW(), NOW())'
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, NOW(), NOW())'
                 );
 
                 foreach ($barisMasuk as $baris) {
@@ -708,6 +708,13 @@ try {
                         'petugas_id',
                         'Nama petugas',
                         150,
+                        $errors
+                    );
+                    $namaPosisi = teks_opsional(
+                        $baris['nama_posisi'] ?? '',
+                        'posisi_id',
+                        'Posisi petugas',
+                        100,
                         $errors
                     );
                     $pekerjaan = teks_opsional(
@@ -775,9 +782,38 @@ try {
                         }
                     }
 
+                    // Posisi petugas hanya bisa disimpan bila jenis kegiatannya
+                    // ada. Posisi baru dibuat otomatis dari nama di file Excel.
+                    $posisiId = null;
+                    if ($jenisId !== null && $namaPosisi !== '') {
+                        $cariPosisi = $pdo->prepare(
+                            'SELECT id FROM posisi_petugas
+                              WHERE jenis_kegiatan_id = ? AND LOWER(nama) = LOWER(?)
+                              LIMIT 1'
+                        );
+                        $cariPosisi->execute([$jenisId, $namaPosisi]);
+                        $posisiId = $cariPosisi->fetchColumn();
+                        if ($posisiId === false) {
+                            $stmtPosisi = $pdo->prepare(
+                                'INSERT INTO posisi_petugas
+                                    (jenis_kegiatan_id, nama, urutan, dibuat_pada, diubah_pada)
+                                 VALUES (?, ?, ?, NOW(), NOW())'
+                            );
+                            $stmtPosisi->execute([
+                                $jenisId,
+                                $namaPosisi,
+                                urutan_posisi_berikutnya($jenisId),
+                            ]);
+                            $posisiId = (int) $pdo->lastInsertId();
+                        } else {
+                            $posisiId = (int) $posisiId;
+                        }
+                    }
+
                     $sisip->execute([
                         $petugasId,
                         $jenisId,
+                        $posisiId,
                         $namaKegiatanId,
                         $bulan,
                         $tahun,

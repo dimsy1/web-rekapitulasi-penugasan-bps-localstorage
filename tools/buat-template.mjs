@@ -1,18 +1,25 @@
 /**
  * Bangun ulang template bawaan aplikasi dari template asli BPS.
  *
+ * Template sumber harus sudah memiliki kolom "Posisi Per Petugas" (kolom E),
+ * sehingga urutan kolom Data Penugasan menjadi:
+ *   A No. | B Nama Petugas | C Jenis Kegiatan | D Nama Pekerjaan/Kegiatan |
+ *   E Posisi Per Petugas | F Bulan | G Tahun | H Honor (Rp)
+ *
  * Perubahan yang dilakukan:
- *  - Rekap Honor Bulanan : baris petugas 6..105 (100 petugas), baris TOTAL pindah 57 -> 107
+ *  - Data Penugasan     : baris 5..304 dikosongkan, nomor A5..A304 ditulis ulang
+ *  - Rekap Honor Bulanan: baris petugas 6..105 (100 petugas), baris TOTAL pindah 57 -> 107
  *  - Rekap Jenis Kegiatan: baris petugas 6..105
  *  - Formula total per baris ditulis ulang (template asli memakai =N6 / =L6 untuk semua baris)
  *  - Conditional formatting B6:M55 -> B6:M105
  *  - Dashboard menunjuk N107 dan COUNTA(A6:A105)
  *
- * Jalankan: node tools/buat-template.mjs "<template-asli.xlsx>" "public/data/template-matriks.xlsx"
+ * Jalankan: node tools/buat-template.mjs "<template-dengan-posisi.xlsx>" "public/data/template-matriks.xlsx"
  */
 import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DAFTAR_BULAN } from '../public/js/bulan.js';
 
 const sumber = process.argv[2];
 const tujuan = process.argv[3] || 'public/data/template-matriks.xlsx';
@@ -23,6 +30,21 @@ const BARIS_DATA_AWAL = 5;
 const BARIS_DATA_AKHIR = 304;
 const KOLOM_JENIS_AWAL = 2; // B
 const KOLOM_JENIS_AKHIR = 11; // K (10 jenis pada template asli)
+const KOLOM_DATA = {
+  no: 'A',
+  petugas: 'B',
+  jenis: 'C',
+  pekerjaan: 'D',
+  posisi: 'E',
+  bulan: 'F',
+  tahun: 'G',
+  honor: 'H',
+};
+const K_PETUGAS = KOLOM_DATA.petugas;
+const K_JENIS = KOLOM_DATA.jenis;
+const K_BULAN = KOLOM_DATA.bulan;
+const K_TAHUN = KOLOM_DATA.tahun;
+const K_HONOR = KOLOM_DATA.honor;
 
 if (!sumber) {
   console.error('Pakai: node tools/buat-template.mjs "<template-asli.xlsx>" [keluaran.xlsx]');
@@ -58,6 +80,18 @@ const bersihkanNilai = (sheet, barisAwal, barisAkhir, kolomAwal, kolomAkhir) => 
 
 const jumlahKolom = (sheet) => Math.max(sheet.columnCount, 15);
 
+/* --------------------------------------------- 0. Data Penugasan ---------- */
+const dataSheet = wb.getWorksheet('Data Penugasan');
+if (!dataSheet) throw new Error('Sheet "Data Penugasan" tidak ditemukan.');
+
+// Template sumber berisi data contoh (dan sisa formula sampai ratusan baris).
+// Kosongkan seluruh baris data, lalu tulis ulang nomor urut di kolom A.
+const kolomDataMaks = Math.max(dataSheet.columnCount || 0, 8);
+bersihkanNilai(dataSheet, BARIS_DATA_AWAL, Math.max(dataSheet.rowCount || 0, BARIS_DATA_AKHIR), 1, kolomDataMaks);
+for (let r = BARIS_DATA_AWAL; r <= BARIS_DATA_AKHIR; r += 1) {
+  dataSheet.getCell(r, 1).value = { formula: `IF(B${r}="","",ROW()-4)` };
+}
+
 /* ------------------------------------------- 1. Rekap Honor Bulanan -------- */
 const bulanan = wb.getWorksheet('Rekap Honor Bulanan');
 if (!bulanan) throw new Error('Sheet "Rekap Honor Bulanan" tidak ditemukan.');
@@ -84,12 +118,12 @@ for (let r = BARIS_AWAL; r <= BARIS_AKHIR; r += 1) {
 
   for (let c = 2; c <= 13; c += 1) {
     row.getCell(c).value = {
-      formula: `IF($A${r}="","",SUMIFS('Data Penugasan'!$G$${BARIS_DATA_AWAL}:$G$${BARIS_DATA_AKHIR},'Data Penugasan'!$B$${BARIS_DATA_AWAL}:$B$${BARIS_DATA_AKHIR},$A${r},'Data Penugasan'!$E$${BARIS_DATA_AWAL}:$E$${BARIS_DATA_AKHIR},${huruf(c)}$5,'Data Penugasan'!$F$${BARIS_DATA_AWAL}:$F$${BARIS_DATA_AKHIR},$B$3))`,
+      formula: `IF($A${r}="","",SUMIFS('Data Penugasan'!$${K_HONOR}$${BARIS_DATA_AWAL}:$${K_HONOR}$${BARIS_DATA_AKHIR},'Data Penugasan'!$${K_PETUGAS}$${BARIS_DATA_AWAL}:$${K_PETUGAS}$${BARIS_DATA_AKHIR},$A${r},'Data Penugasan'!$${K_BULAN}$${BARIS_DATA_AWAL}:$${K_BULAN}$${BARIS_DATA_AKHIR},${huruf(c)}$5,'Data Penugasan'!$${K_TAHUN}$${BARIS_DATA_AWAL}:$${K_TAHUN}$${BARIS_DATA_AKHIR},$B$3))`,
     };
   }
   row.getCell(14).value = { formula: `IF($A${r}="","",SUM(B${r}:M${r}))` };
   row.getCell(15).value = {
-    formula: `IF($A${r}="","",COUNTIFS('Data Penugasan'!$B$${BARIS_DATA_AWAL}:$B$${BARIS_DATA_AKHIR},$A${r},'Data Penugasan'!$F$${BARIS_DATA_AWAL}:$F$${BARIS_DATA_AKHIR},$B$3))`,
+    formula: `IF($A${r}="","",COUNTIFS('Data Penugasan'!$${K_PETUGAS}$${BARIS_DATA_AWAL}:$${K_PETUGAS}$${BARIS_DATA_AKHIR},$A${r},'Data Penugasan'!$${K_TAHUN}$${BARIS_DATA_AWAL}:$${K_TAHUN}$${BARIS_DATA_AKHIR},$B$3))`,
   };
 }
 
@@ -138,7 +172,7 @@ for (let r = BARIS_AWAL; r <= BARIS_AKHIR; r += 1) {
 
   for (let c = KOLOM_JENIS_AWAL; c <= KOLOM_JENIS_AKHIR; c += 1) {
     row.getCell(c).value = {
-      formula: `IF($A${r}="","",SUMIFS('Data Penugasan'!$G$${BARIS_DATA_AWAL}:$G$${BARIS_DATA_AKHIR},'Data Penugasan'!$B$${BARIS_DATA_AWAL}:$B$${BARIS_DATA_AKHIR},$A${r},'Data Penugasan'!$C$${BARIS_DATA_AWAL}:$C$${BARIS_DATA_AKHIR},${huruf(c)}$5,'Data Penugasan'!$F$${BARIS_DATA_AWAL}:$F$${BARIS_DATA_AKHIR},$B$3))`,
+      formula: `IF($A${r}="","",SUMIFS('Data Penugasan'!$${K_HONOR}$${BARIS_DATA_AWAL}:$${K_HONOR}$${BARIS_DATA_AKHIR},'Data Penugasan'!$${K_PETUGAS}$${BARIS_DATA_AWAL}:$${K_PETUGAS}$${BARIS_DATA_AKHIR},$A${r},'Data Penugasan'!$${K_JENIS}$${BARIS_DATA_AWAL}:$${K_JENIS}$${BARIS_DATA_AKHIR},${huruf(c)}$5,'Data Penugasan'!$${K_TAHUN}$${BARIS_DATA_AWAL}:$${K_TAHUN}$${BARIS_DATA_AKHIR},$B$3))`,
     };
   }
   row.getCell(KOLOM_JENIS_AKHIR + 1).value = {

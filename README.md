@@ -66,14 +66,17 @@ pengolah data). Aturannya:
   pesan kesalahan menunjuk ke halaman **Daftar Jenis Kegiatan**.
 - Posisi yang sudah dipakai penugasan tidak bisa dihapus (sama seperti jenis dan
   petugas). Ubah namanya bila hanya perlu koreksi.
-- Penugasan lama atau hasil impor Excel tidak punya posisi. Baris seperti ini tetap
-  dihitung dan tampil di subkolom **Tanpa posisi** pada **Rekap per Jenis
-  Kegiatan**, sampai posisinya diisi lewat halaman **Daftar Penugasan**.
+- Impor Excel membaca kolom **Posisi Per Petugas**. Posisi yang belum ada pada
+  jenis kegiatannya dibuat otomatis; nama posisi dicocokkan tanpa membedakan
+  huruf besar/kecil. Baris yang posisinya kosong tetap diimpor dan tampil di
+  subkolom **Tanpa posisi** pada **Rekap per Jenis Kegiatan**, sampai posisinya
+  diisi lewat halaman **Daftar Penugasan**.
 - Rekap per Jenis Kegiatan sekarang berkelompok per jenis, dengan subkolom tiap
   posisi ditambah **Tanpa posisi**. Baris bawah menampilkan total setiap posisi
   sekaligus total keseluruhan.
-- Impor/ekspor Excel **belum** memuat posisi: impor menambahkan baris tanpa posisi,
-  dan ekspor tetap menggabungkan honor per jenis kegiatan.
+- Ekspor Excel ikut menulis kolom **Posisi Per Petugas** dan tetap menggabungkan
+  honor per jenis kegiatan. **Limit honor posisi tidak diisi dari file**; atur
+  manual di halaman **Daftar Jenis Kegiatan** bila penugasan akan diedit.
 
 ## Menjalankan secara lokal
 
@@ -160,16 +163,17 @@ halaman **Daftar Penugasan**. Petugas baru otomatis dibuat saat namanya diketik.
 
 1. Buka halaman **Data & Excel**.
 2. Pilih atau seret satu atau beberapa file `.xlsx` ke area impor.
-3. Periksa pratinjau (jumlah petugas, jenis, tahun analisis B3, total honor, baris
-   bermasalah, dan catatan bila ada nama yang tidak konsisten).
+3. Periksa pratinjau (jumlah petugas, jenis, posisi, tahun analisis B3, total honor,
+   baris bermasalah, dan catatan bila ada nama yang tidak konsisten).
 4. Klik **Impor Data** untuk menambahkan hasil impor ke database.
 5. Setelah itu semua perubahan di web langsung tersimpan di database dan terlihat
    oleh admin lain (muat ulang otomatis saat tab kembali aktif).
 6. Untuk arsip: **Unduh sesuai template Excel**.
 
-Baris hasil impor belum punya posisi petugas. Sebelum menyimpan ulang, lengkapi
-posisinya di halaman **Daftar Penugasan** (atau biarkan tampil di subkolom
-**Tanpa posisi** pada rekap). Limit honor posisi juga perlu diatur di halaman
+Posisi petugas dibaca dari kolom **Posisi Per Petugas** dan dibuat otomatis bila
+belum ada. Baris tanpa posisi tetap tersimpan dan bisa dilengkapi di halaman
+**Daftar Penugasan** (atau dibiarkan tampil di subkolom **Tanpa posisi** pada
+rekap). Limit honor posisi tidak diisi dari file; atur manual di halaman
 **Daftar Jenis Kegiatan** untuk tahun yang dipakai.
 
 Nama petugas dan jenis kegiatan yang sama berbagi satu entri, dengan mengabaikan
@@ -213,13 +217,15 @@ Yang dibaca dari file template:
 
 Header sheet `Data Penugasan` dicari otomatis:
 
-| No. | Nama Petugas | Jenis Kegiatan | Nama Pekerjaan/Kegiatan | Bulan | Tahun | Honor (Rp) |
-| --- | --- | --- | --- | --- | --- | --- |
+| No. | Nama Petugas | Jenis Kegiatan | Nama Pekerjaan/Kegiatan | Posisi Per Petugas | Bulan | Tahun | Honor (Rp) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 
 - Bulan menerima nama (`Januari`…`Desember`), singkatan (`Jan`, `Feb`, …), atau angka 1–12.
 - Honor menerima angka Excel maupun teks seperti `Rp 1.500.000`.
 - **Hanya Nama Petugas yang wajib.** Kolom lain boleh kosong: baris tetap diimpor
   sebagai **belum lengkap** dan bisa dilengkapi di web.
+- Kolom **Posisi Per Petugas** boleh tidak ada pada file lama; posisi baru dibuat
+  otomatis dari nama di file bila jenis kegiatannya ada.
 - Tahun yang kosong ditempatkan pada tahun analisis `B3` agar baris tetap muncul.
 - Baris yang benar-benar tidak valid (misalnya bulan salah tulis) dilewati dan
   ditampilkan pada pratinjau.
@@ -231,8 +237,8 @@ Header sheet `Data Penugasan` dicari otomatis:
 
 #### Baris belum lengkap
 
-Baris yang jenis kegiatan, pekerjaan, bulan, atau honor-nya masih kosong tetap
-disimpan dan diberi tanda **Belum lengkap** di halaman **Daftar Penugasan**
+Baris yang jenis kegiatan, posisi, pekerjaan, bulan, atau honor-nya masih kosong
+tetap disimpan dan diberi tanda **Belum lengkap** di halaman **Daftar Penugasan**
 (kolom kosong ditampilkan sebagai *Belum diisi*). Gunakan filter status:
 
 - **Semua status** — semua baris.
@@ -283,8 +289,10 @@ sebagai cetakan (bila belum pernah impor, dipakai template bawaan
   dari web diletakkan di akhir.
 - Header jenis kegiatan pada sheet **Rekap Jenis Kegiatan** disusun mengikuti
   daftar jenis di web.
-- Baris yang belum lengkap ditulis apa adanya: sel jenis/bulan/honor yang kosong
-  dibiarkan kosong agar bisa dilengkapi di Excel.
+- Kolom **Posisi Per Petugas** pada sheet **Data Penugasan** ikut ditulis; baris
+  tanpa posisi dibiarkan kosong.
+- Baris yang belum lengkap ditulis apa adanya: sel jenis/posisi/bulan/honor yang
+  kosong dibiarkan kosong agar bisa dilengkapi di Excel.
 - Formula total per baris diperbaiki (template asli selalu menunjuk baris pertama).
 
 Batas mengikuti file template yang dipakai. Template bawaan menampung **300 baris**

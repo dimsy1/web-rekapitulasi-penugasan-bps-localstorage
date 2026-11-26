@@ -294,6 +294,9 @@ export const server = {
       const petaJenis = new Map(
         (sumber.jenis || []).map((item) => [Number(item.id), item.nama])
       );
+      const petaPosisi = new Map(
+        (sumber.posisi || []).map((item) => [Number(item.id), item.nama])
+      );
 
       for (const nama of petaPetugas.values()) {
         const teks = rapikanTeks(nama);
@@ -316,6 +319,7 @@ export const server = {
         baris.push({
           nama_petugas: petaPetugas.get(Number(item.petugas_id)) || '',
           nama_jenis: petaJenis.get(Number(item.jenis_kegiatan_id)) || '',
+          nama_posisi: petaPosisi.get(Number(item.posisi_id)) || '',
           nama_pekerjaan: item.nama_pekerjaan || '',
           bulan: item.bulan,
           tahun: item.tahun,

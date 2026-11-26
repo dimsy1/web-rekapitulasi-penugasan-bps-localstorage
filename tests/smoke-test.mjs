@@ -32,7 +32,7 @@ if (typeof globalThis.CustomEvent === 'undefined') {
 }
 globalThis.ExcelJS = ExcelJS;
 
-const { imporFileExcel, buatWorkbook, buatWorkbookTemplate } = await import(
+const { imporFileExcel, buatWorkbook, buatWorkbookTemplate, gabungkanRingkas, ringkasanDataset } = await import(
   '../public/js/store/excel.js'
 );
 const { simpanDataset, bacaDataset, datasetKosong, gabungkanDataset } = await import(
@@ -106,6 +106,60 @@ async function uji() {
   assert.equal(hasil.ringkasan.totalHonor, 5_500_000);
   assert.equal(hasil.data.penugasan.length, 5);
   console.log('OK impor Excel: 5 valid, 2 dilewati');
+
+  // --- Impor kolom "Posisi Per Petugas" ------------------------------------
+  const wbPosisi = new ExcelJS.Workbook();
+  const wsPosisi = wbPosisi.addWorksheet('Data Penugasan');
+  [
+    'No.',
+    'Nama Petugas',
+    'Jenis Kegiatan',
+    'Nama Pekerjaan/Kegiatan',
+    'Posisi Per Petugas',
+    'Bulan',
+    'Tahun',
+    'Honor (Rp)',
+  ].forEach((teks, indeks) => {
+    wsPosisi.getCell(4, indeks + 1).value = teks;
+  });
+  [
+    ['Orang A', 'Survei', 'KERJA A', 'PPL', 'Januari', 2026, 100000],
+    ['Orang B', 'Survei', 'KERJA B', 'PML', 'Januari', 2026, 200000],
+    ['Orang C', 'Survei', 'KERJA C', 'ppl', 'Februari', 2026, 300000],
+    ['Orang D', 'Sensus', 'KERJA D', 'PPL', 'Maret', 2026, 400000],
+    ['Orang E', 'Survei', 'KERJA E', '', 'April', 2026, 500000],
+  ].forEach((data, indeks) => {
+    data.forEach((nilai, kolom) => {
+      wsPosisi.getCell(5 + indeks, kolom + 2).value = nilai;
+    });
+  });
+  const bufferPosisi = await wbPosisi.xlsx.writeBuffer();
+  const hasilPosisi = await imporFileExcel({
+    name: 'posisi.xlsx',
+    arrayBuffer: async () => bufferPosisi,
+  });
+  assert.equal(hasilPosisi.ringkasan.jumlahPosisi, 3, 'posisi unik per jenis kegiatan');
+  assert.deepEqual(
+    hasilPosisi.data.posisi.map(
+      (baris) =>
+        `${hasilPosisi.data.jenis.find((j) => j.id === baris.jenis_kegiatan_id).nama}:${baris.nama}`
+    ),
+    ['Survei:PPL', 'Survei:PML', 'Sensus:PPL']
+  );
+  assert.equal(hasilPosisi.data.penugasan[0].posisi_id, hasilPosisi.data.posisi[0].id);
+  assert.equal(
+    hasilPosisi.data.penugasan[2].posisi_id,
+    hasilPosisi.data.posisi[0].id,
+    'nama posisi dicocokkan tanpa membedakan huruf besar/kecil'
+  );
+  assert.equal(hasilPosisi.data.penugasan[4].posisi_id, null, 'baris tanpa posisi tetap kosong');
+  assert.equal(hasilPosisi.ringkasan.jumlahBelumLengkap, 1, 'hanya baris tanpa posisi yang belum lengkap');
+
+  // Pratinjau gabungan harus membawa posisi, bukan menghitungnya sebagai kosong.
+  const ringkasPosisi = ringkasanDataset(gabungkanRingkas([hasilPosisi.data]));
+  assert.equal(ringkasPosisi.jumlahPosisi, 3, 'posisi ikut pada ringkasan pratinjau');
+  assert.equal(ringkasPosisi.jumlahBelumLengkap, 1, 'pratinjau tidak menandai semua baris kosong');
+  console.log('OK impor kolom Posisi Per Petugas');
 
   simpanDataset(hasil.data);
   assert.equal(bacaDataset().penugasan.length, 5);
@@ -328,8 +382,8 @@ async function uji() {
   await dibacaUlang.xlsx.load(bufferEkspor);
   const sheetData = dibacaUlang.getWorksheet('Data Penugasan');
   assert.equal(sheetData.getCell('B5').value, 'Budi Santoso');
-  assert.equal(sheetData.getCell('E5').value, 'Januari');
-  assert.equal(sheetData.getCell('G5').value, 1500000);
+  assert.equal(sheetData.getCell('F5').value, 'Januari');
+  assert.equal(sheetData.getCell('H5').value, 1500000);
   assert.equal(bacaDataset().penugasan.length, 5);
   console.log('OK ekspor workbook dan baca ulang');
 

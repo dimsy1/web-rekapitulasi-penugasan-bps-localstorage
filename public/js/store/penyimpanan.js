@@ -395,19 +395,56 @@ export function gabungkanDataset(dataLama, sumberImpor) {
 
   const tambahPetugas = siapkanMaster(hasil.petugas);
   const tambahJenis = siapkanMaster(hasil.jenis);
+
+  // Posisi adalah master per jenis kegiatan; cocokkan berdasarkan
+  // jenis + nama agar ID dari tiap file dipetakan ke ID dataset lama.
+  const posisiPerKunci = new Map(
+    hasil.posisi.map((baris) => [
+      `${Number(baris.jenis_kegiatan_id)}:${rapikanTeks(baris.nama).toLowerCase()}`,
+      Number(baris.id),
+    ])
+  );
+  let idPosisi = idBerikutnya(hasil.posisi);
+  let urutanPosisi = hasil.posisi.reduce((maks, baris) => Math.max(maks, Number(baris.urutan) || 0), 0) + 1;
+  const tambahPosisi = (daftarImpor, petaJenis) => {
+    const petaId = new Map();
+    for (const baris of daftarImpor) {
+      const nama = rapikanTeks(baris.nama);
+      const jenisId = petaJenis.get(Number(baris.jenis_kegiatan_id));
+      if (!nama || jenisId === undefined || jenisId === null) continue;
+      const kunci = `${Number(jenisId)}:${nama.toLowerCase()}`;
+      if (!posisiPerKunci.has(kunci)) {
+        posisiPerKunci.set(kunci, idPosisi);
+        hasil.posisi.push({
+          id: idPosisi++,
+          jenis_kegiatan_id: Number(jenisId),
+          nama,
+          urutan: urutanPosisi++,
+        });
+      }
+      petaId.set(Number(baris.id), posisiPerKunci.get(kunci));
+    }
+    return petaId;
+  };
+
   let idPenugasan = idBerikutnya(hasil.penugasan);
   for (const sumber of sumberImpor) {
     const data = normalisasiDataset(sumber);
     const petugas = tambahPetugas(data.petugas);
     const jenis = tambahJenis(data.jenis);
+    const posisi = tambahPosisi(data.posisi, jenis);
     for (const baris of data.penugasan) {
       hasil.penugasan.push({
         ...baris,
         id: idPenugasan++,
         petugas_id: petugas.get(baris.petugas_id),
         jenis_kegiatan_id: jenis.get(baris.jenis_kegiatan_id) ?? null,
-        // Impor Excel tidak membawa posisi; baris masuk ke subkolom "Tanpa posisi".
-        posisi_id: null,
+        // Posisi dari file dipetakan ulang; baris tanpa posisi masuk ke
+        // subkolom "Tanpa posisi".
+        posisi_id:
+          baris.posisi_id !== null && posisi.has(Number(baris.posisi_id))
+            ? posisi.get(Number(baris.posisi_id))
+            : null,
       });
     }
   }

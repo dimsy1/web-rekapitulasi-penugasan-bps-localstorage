@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { adminAktif } from './sesi.js';
 import {
   eksporTemplate,
+  gabungkanRingkas,
   imporFileExcel,
   ringkasanDataset,
   unduhTemplateKosong,
@@ -105,6 +106,7 @@ function renderPratinjau(hasil) {
     <dl class="import-facts">
       <div><dt>Petugas terbaca</dt><dd>${formatAngka(ringkasan.jumlahPetugas)}</dd></div>
       <div><dt>Jenis kegiatan terbaca</dt><dd>${formatAngka(ringkasan.jumlahJenis)}</dd></div>
+      <div><dt>Posisi terbaca</dt><dd>${formatAngka(ringkasan.jumlahPosisi || 0)}</dd></div>
       <div><dt>Tahun penugasan</dt><dd>${escapeHtml(tahun)}</dd></div>
       <div><dt>Total honor</dt><dd>${formatRupiah(ringkasan.totalHonor)}</dd></div>
       <div><dt>Belum lengkap</dt><dd>${
@@ -184,53 +186,6 @@ async function pilihFile(daftarFile) {
   } finally {
     setSibuk(false);
   }
-}
-
-/** Gabungan ringan khusus pratinjau (tanpa menyentuh data tersimpan). */
-function gabungkanRingkas(daftar) {
-  const petugas = [];
-  const jenis = [];
-  const penugasan = [];
-
-  for (const data of daftar) {
-    const petaPetugas = new Map();
-    for (const baris of data.petugas || []) {
-      const kunci = String(baris.nama).trim().toLowerCase();
-      if (!kunci) continue;
-      let baru = petugas.find((item) => item.nama.toLowerCase() === kunci);
-      if (!baru) {
-        baru = { id: petugas.length + 1, nama: baris.nama, urutan: petugas.length + 1 };
-        petugas.push(baru);
-      }
-      petaPetugas.set(Number(baris.id), baru.id);
-    }
-
-    const petaJenis = new Map();
-    for (const baris of data.jenis || []) {
-      const kunci = String(baris.nama).trim().toLowerCase();
-      if (!kunci) continue;
-      let baru = jenis.find((item) => item.nama.toLowerCase() === kunci);
-      if (!baru) {
-        baru = { id: jenis.length + 1, nama: baris.nama, urutan: jenis.length + 1 };
-        jenis.push(baru);
-      }
-      petaJenis.set(Number(baris.id), baru.id);
-    }
-
-    for (const baris of data.penugasan || []) {
-      penugasan.push({
-        id: penugasan.length + 1,
-        petugas_id: petaPetugas.get(Number(baris.petugas_id)) || null,
-        jenis_kegiatan_id: petaJenis.get(Number(baris.jenis_kegiatan_id)) || null,
-        nama_pekerjaan: baris.nama_pekerjaan || '',
-        bulan: baris.bulan,
-        tahun: baris.tahun,
-        honor: baris.honor,
-      });
-    }
-  }
-
-  return { versi: 3, petugas, jenis, penugasan };
 }
 
 async function konfirmasiImpor(hasil) {
@@ -493,7 +448,7 @@ el('batal-impor').addEventListener('click', resetPratinjau);
 el('terapkan-impor').addEventListener('click', terapkanImpor);
 el('btn-ekspor-template').addEventListener('click', eksporDenganTemplate);
 el('btn-template-kosong').addEventListener('click', unduhTemplate);
-el('btn-reset').addEventListener('click', kosongkan);
+el('btn-reset')?.addEventListener('click', kosongkan);
 el('btn-log')?.addEventListener('click', muatLog);
 
 window.addEventListener('data-berubah', perbaruiStatistik);

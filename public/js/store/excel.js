@@ -131,6 +131,7 @@ function cariHeader(worksheet) {
       const judul = normalisasiTeks(nilaiSel(cell));
       if (!judul) return;
       if (judul.includes('namapetugas') || judul === 'petugas') kolom.set('petugas', indeksKolom);
+      else if (judul.includes('posisi')) kolom.set('posisi', indeksKolom);
       else if (judul.includes('jenis')) kolom.set('jenis', indeksKolom);
       else if (judul.includes('pekerjaan') || judul.includes('kegiatan')) {
         kolom.set('pekerjaan', indeksKolom);
@@ -176,6 +177,7 @@ function bacaBarisData(worksheet) {
 
     const petugas = rapikanTeks(ambil('petugas'));
     const jenis = rapikanTeks(ambil('jenis'));
+    const posisi = rapikanTeks(header.kolom.has('posisi') ? ambil('posisi') : '');
     const pekerjaan = rapikanTeks(ambil('pekerjaan'));
     const bulanMentah = ambil('bulan');
     const tahunMentah = ambil('tahun');
@@ -184,6 +186,7 @@ function bacaBarisData(worksheet) {
     const kosong =
       !petugas &&
       !jenis &&
+      !posisi &&
       !pekerjaan &&
       rapikanTeks(bulanMentah) === '' &&
       rapikanTeks(tahunMentah) === '' &&
@@ -197,6 +200,7 @@ function bacaBarisData(worksheet) {
     else if (petugas.length > 150) masalah.push('Nama petugas lebih dari 150 karakter.');
 
     if (jenis && jenis.length > 100) masalah.push('Jenis kegiatan lebih dari 100 karakter.');
+    if (posisi && posisi.length > 100) masalah.push('Posisi petugas lebih dari 100 karakter.');
     if (pekerjaan && pekerjaan.length > 255) {
       masalah.push('Nama pekerjaan/kegiatan lebih dari 255 karakter.');
     }
@@ -228,6 +232,7 @@ function bacaBarisData(worksheet) {
       baris: nomor,
       petugas,
       jenis,
+      posisi,
       pekerjaan,
       bulan,
       tahun,
@@ -265,6 +270,16 @@ function bacaReferensi(workbook) {
 const STRUKTUR_BAWAAN = {
   dataAwal: 5,
   dataAkhir: 304,
+  headerData: 4,
+  kolomData: {
+    petugas: 2,
+    jenis: 3,
+    pekerjaan: 4,
+    posisi: 5,
+    bulan: 6,
+    tahun: 7,
+    honor: 8,
+  },
   petugasAwal: 6,
   petugasAkhir: 55,
   barisTotalBulanan: null,
@@ -298,6 +313,17 @@ export function deteksiStrukturTemplate(workbook) {
   const struktur = { ...STRUKTUR_BAWAAN };
   const bulanan = cariSheet(workbook, NAMA_SHEET_REKAP_BULANAN);
   const jenis = cariSheet(workbook, NAMA_SHEET_REKAP_JENIS);
+  const data = cariSheet(workbook, NAMA_SHEET_DATA);
+
+  if (data) {
+    // Kolom Data Penugasan dibaca dari judulnya supaya template yang menambah
+    // kolom (mis. "Posisi Per Petugas") tetap bisa diekspor dengan benar.
+    const header = cariHeader(data);
+    if (header) {
+      struktur.headerData = header.nomor;
+      struktur.kolomData = Object.fromEntries(header.kolom);
+    }
+  }
 
   if (bulanan) {
     const kolomTotal = kolomDariJudul(bulanan, 5, 'Total Setahun');
@@ -512,13 +538,38 @@ function bangunDataset(
   // Nama dari kolom A sheet rekap didahulukan agar urutannya seperti di file.
   for (const nama of petugasRekap) tambahPetugas(nama);
 
+  // Posisi petugas adalah master per jenis kegiatan. Nama posisi yang sama
+  // pada jenis berbeda disimpan sebagai posisi terpisah, mengikuti aturan web.
+  const posisiMap = new Map();
+  const posisi = [];
+  const urutanPosisi = new Map();
+  const tambahPosisi = (jenisId, nama) => {
+    const teks = rapikanTeks(nama);
+    if (!teks || jenisId === null || jenisId === undefined) return null;
+    const kunci = `${jenisId}:${teks.toLowerCase()}`;
+    if (posisiMap.has(kunci)) return posisiMap.get(kunci);
+    const urutan = (urutanPosisi.get(jenisId) || 0) + 1;
+    urutanPosisi.set(jenisId, urutan);
+    const baris = {
+      id: posisi.length + 1,
+      jenis_kegiatan_id: jenisId,
+      nama: teks,
+      urutan,
+    };
+    posisiMap.set(kunci, baris);
+    posisi.push(baris);
+    return baris;
+  };
+
   const penugasan = records.map((record, indeks) => {
     const orang = tambahPetugas(record.petugas);
     const kategori = record.jenis ? jenisMap.get(record.jenis.toLowerCase()) : null;
+    const posisiBaris = tambahPosisi(kategori ? kategori.id : null, record.posisi);
     return {
       id: indeks + 1,
       petugas_id: orang.id,
       jenis_kegiatan_id: kategori ? kategori.id : null,
+      posisi_id: posisiBaris ? posisiBaris.id : null,
       nama_pekerjaan: record.pekerjaan || '',
       bulan: record.bulan ?? null,
       // Baris tanpa tahun tetap ditampung pada tahun analisis B3 / tahun aktif,
@@ -528,7 +579,80 @@ function bangunDataset(
     };
   });
 
-  return normalisasiDataset({ versi: 2, jenis, petugas, penugasan });
+  return normalisasiDataset({ versi: 2, jenis, posisi, petugas, penugasan });
+}
+
+/** Gabungan ringan beberapa hasil impor untuk pratinjau (tanpa menyentuh data tersimpan). */
+export function gabungkanRingkas(daftar) {
+  const petugas = [];
+  const jenis = [];
+  const posisi = [];
+  const penugasan = [];
+
+  for (const data of daftar) {
+    const petaPetugas = new Map();
+    for (const baris of data.petugas || []) {
+      const kunci = String(baris.nama).trim().toLowerCase();
+      if (!kunci) continue;
+      let baru = petugas.find((item) => item.nama.toLowerCase() === kunci);
+      if (!baru) {
+        baru = { id: petugas.length + 1, nama: baris.nama, urutan: petugas.length + 1 };
+        petugas.push(baru);
+      }
+      petaPetugas.set(Number(baris.id), baru.id);
+    }
+
+    const petaJenis = new Map();
+    for (const baris of data.jenis || []) {
+      const kunci = String(baris.nama).trim().toLowerCase();
+      if (!kunci) continue;
+      let baru = jenis.find((item) => item.nama.toLowerCase() === kunci);
+      if (!baru) {
+        baru = { id: jenis.length + 1, nama: baris.nama, urutan: jenis.length + 1 };
+        jenis.push(baru);
+      }
+      petaJenis.set(Number(baris.id), baru.id);
+    }
+
+    // Posisi adalah master per jenis kegiatan, jadi dicocokkan per jenis + nama.
+    const petaPosisi = new Map();
+    for (const baris of data.posisi || []) {
+      const jenisId = petaJenis.get(Number(baris.jenis_kegiatan_id));
+      const nama = String(baris.nama || '').trim();
+      if (!nama || jenisId === null || jenisId === undefined) continue;
+      const kunci = nama.toLowerCase();
+      let baru = posisi.find(
+        (item) => item.jenis_kegiatan_id === jenisId && item.nama.toLowerCase() === kunci
+      );
+      if (!baru) {
+        baru = {
+          id: posisi.length + 1,
+          jenis_kegiatan_id: jenisId,
+          nama,
+          urutan: posisi.length + 1,
+        };
+        posisi.push(baru);
+      }
+      petaPosisi.set(Number(baris.id), baru.id);
+    }
+
+    for (const baris of data.penugasan || []) {
+      const jenisId = petaJenis.get(Number(baris.jenis_kegiatan_id)) || null;
+      const posisiId = petaPosisi.get(Number(baris.posisi_id)) || null;
+      penugasan.push({
+        id: penugasan.length + 1,
+        petugas_id: petaPetugas.get(Number(baris.petugas_id)) || null,
+        jenis_kegiatan_id: jenisId,
+        posisi_id: jenisId !== null ? posisiId : null,
+        nama_pekerjaan: baris.nama_pekerjaan || '',
+        bulan: baris.bulan,
+        tahun: baris.tahun,
+        honor: baris.honor,
+      });
+    }
+  }
+
+  return { versi: 3, petugas, jenis, posisi, penugasan };
 }
 
 export function ringkasanDataset(dataset) {
@@ -543,6 +667,7 @@ export function ringkasanDataset(dataset) {
     jumlahBaris: dataset.penugasan.length,
     jumlahPetugas: dataset.petugas.length,
     jumlahJenis: dataset.jenis.length,
+    jumlahPosisi: (dataset.posisi || []).length,
     jumlahBelumLengkap: dataset.penugasan.filter((baris) => kolomKosong(baris).length > 0).length,
     tahun,
     totalHonor: dataset.penugasan.reduce((total, baris) => total + (Number(baris.honor) || 0), 0),
@@ -593,7 +718,18 @@ export async function imporFileExcel(file) {
   const peringatan = [];
   if (belumLengkap > 0) {
     peringatan.push(
-      `${belumLengkap} baris belum lengkap (jenis/pekerjaan/bulan/honor kosong) dan tetap disimpan. Lengkapi lewat halaman Daftar Penugasan dengan filter "Belum lengkap".`
+      `${belumLengkap} baris belum lengkap (jenis/posisi/pekerjaan/bulan/honor kosong) dan tetap disimpan. Lengkapi lewat halaman Daftar Penugasan dengan filter "Belum lengkap".`
+    );
+  }
+  const posisiTanpaJenis = records.filter((record) => record.posisi && !record.jenis).length;
+  if (posisiTanpaJenis > 0) {
+    peringatan.push(
+      `${posisiTanpaJenis} baris mencantumkan posisi petugas tetapi jenis kegiatannya kosong, sehingga posisi tidak disimpan.`
+    );
+  }
+  if (data.posisi.length > 0) {
+    peringatan.push(
+      `${data.posisi.length} posisi petugas dibaca dari file. Limit honor posisi belum diatur; atur di halaman Daftar Jenis Kegiatan bila penugasan akan diedit.`
     );
   }
   if (tanpaTahun > 0) {
@@ -698,19 +834,20 @@ function isiSheetData(workbook, dataset) {
     { width: 26 },
     { width: 24 },
     { width: 48 },
+    { width: 30 },
     { width: 14 },
     { width: 10 },
     { width: 16 },
   ];
 
-  sheet.mergeCells('A1:G1');
+  sheet.mergeCells('A1:H1');
   const judul = sheet.getCell('A1');
   judul.value = 'TEMPLATE DATA PENUGASAN DAN HONOR PETUGAS';
   judul.font = { bold: true, size: 14, color: { argb: 'FF0B2E4F' } };
   judul.alignment = { vertical: 'middle' };
   sheet.getRow(1).height = 24;
 
-  sheet.mergeCells('A2:G2');
+  sheet.mergeCells('A2:H2');
   const petunjuk = sheet.getCell('A2');
   petunjuk.value =
     'Satu baris untuk setiap penugasan. Bulan diisi Januari–Desember, honor berupa angka bulat rupiah.';
@@ -721,6 +858,7 @@ function isiSheetData(workbook, dataset) {
     'Nama Petugas',
     'Jenis Kegiatan',
     'Nama Pekerjaan/Kegiatan',
+    'Posisi Per Petugas',
     'Bulan',
     'Tahun',
     'Honor (Rp)',
@@ -735,6 +873,9 @@ function isiSheetData(workbook, dataset) {
   const terurut = dataset.penugasan
     .slice()
     .sort((a, b) => a.tahun - b.tahun || a.bulan - b.bulan || a.id - b.id);
+  const petaPosisi = new Map(
+    (dataset.posisi || []).map((item) => [Number(item.id), item.nama])
+  );
 
   let nomor = 5;
   for (const baris of terurut) {
@@ -748,24 +889,25 @@ function isiSheetData(workbook, dataset) {
     sheet.getCell(nomor, 2).value = orang?.nama || '';
     sheet.getCell(nomor, 3).value = jenis?.nama || '';
     sheet.getCell(nomor, 4).value = baris.nama_pekerjaan;
-    sheet.getCell(nomor, 5).value = BULAN[baris.bulan] || '';
-    sheet.getCell(nomor, 6).value = baris.tahun;
-    sheet.getCell(nomor, 7).value = baris.honor;
-    sheet.getCell(nomor, 7).numFmt = '#,##0';
+    sheet.getCell(nomor, 5).value = petaPosisi.get(Number(baris.posisi_id)) || '';
+    sheet.getCell(nomor, 6).value = BULAN[baris.bulan] || '';
+    sheet.getCell(nomor, 7).value = baris.tahun;
+    sheet.getCell(nomor, 8).value = baris.honor;
+    sheet.getCell(nomor, 8).numFmt = '#,##0';
 
     const daftarBulan = DAFTAR_BULAN.map((bulan) => bulan.nama).join(',');
-    sheet.getCell(nomor, 5).dataValidation = {
+    sheet.getCell(nomor, 6).dataValidation = {
       type: 'list',
       allowBlank: false,
       formulae: [`"${daftarBulan}"`],
     };
-    sheet.getCell(nomor, 6).dataValidation = {
+    sheet.getCell(nomor, 7).dataValidation = {
       type: 'whole',
       operator: 'between',
       allowBlank: false,
       formulae: [2020, 2100],
     };
-    sheet.getCell(nomor, 7).dataValidation = {
+    sheet.getCell(nomor, 8).dataValidation = {
       type: 'decimal',
       operator: 'greaterThanOrEqual',
       allowBlank: false,
@@ -776,7 +918,7 @@ function isiSheetData(workbook, dataset) {
   }
 
   if (terurut.length > 0) {
-    sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: nomor - 1, column: 7 } };
+    sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: nomor - 1, column: 8 } };
   }
 
   return sheet;
@@ -885,6 +1027,16 @@ function hurufKolom(indeks) {
   return hasil;
 }
 
+/** Nomor kolom sheet Data Penugasan menurut judul template. */
+function kolomData(struktur, kunci, cadangan) {
+  return Number(struktur?.kolomData?.[kunci]) || cadangan;
+}
+
+/** Huruf kolom sheet Data Penugasan menurut judul template. */
+function hurufData(struktur, kunci, cadangan) {
+  return hurufKolom(kolomData(struktur, kunci, cadangan));
+}
+
 /** Kosongkan isi sel (nilai & formula) tanpa menghapus gaya/border. */
 function kosongkan(sheet, barisAwal, barisAkhir, kolomAwal, kolomAkhir) {
   for (let baris = barisAwal; baris <= barisAkhir; baris += 1) {
@@ -911,7 +1063,14 @@ function isiDataPenugasan(workbook, dataset, struktur) {
     );
   }
 
-  kosongkan(sheet, struktur.dataAwal, struktur.dataAkhir, 2, 7);
+  const kolom = struktur.kolomData || STRUKTUR_BAWAAN.kolomData;
+  const awal = Math.min(...Object.values(kolom));
+  const akhir = Math.max(...Object.values(kolom));
+  kosongkan(sheet, struktur.dataAwal, struktur.dataAkhir, awal, akhir);
+
+  const petaPosisi = new Map(
+    (dataset.posisi || []).map((item) => [Number(item.id), item.nama])
+  );
 
   baris.forEach((data, indeks) => {
     const nomor = struktur.dataAwal + indeks;
@@ -919,12 +1078,16 @@ function isiDataPenugasan(workbook, dataset, struktur) {
     const jenis = dataset.jenis.find(
       (item) => Number(item.id) === Number(data.jenis_kegiatan_id)
     );
-    sheet.getCell(nomor, 2).value = orang?.nama || '';
-    sheet.getCell(nomor, 3).value = jenis?.nama || '';
-    sheet.getCell(nomor, 4).value = data.nama_pekerjaan;
-    sheet.getCell(nomor, 5).value = BULAN[data.bulan] || '';
-    sheet.getCell(nomor, 6).value = data.tahun;
-    sheet.getCell(nomor, 7).value = data.honor;
+    sheet.getCell(nomor, kolom.petugas).value = orang?.nama || '';
+    sheet.getCell(nomor, kolom.jenis).value = jenis?.nama || '';
+    sheet.getCell(nomor, kolom.pekerjaan).value = data.nama_pekerjaan;
+    if (kolom.posisi) {
+      sheet.getCell(nomor, kolom.posisi).value =
+        petaPosisi.get(Number(data.posisi_id)) || '';
+    }
+    sheet.getCell(nomor, kolom.bulan).value = BULAN[data.bulan] || '';
+    sheet.getCell(nomor, kolom.tahun).value = data.tahun;
+    sheet.getCell(nomor, kolom.honor).value = data.honor;
   });
 
   return sheet;
@@ -982,6 +1145,8 @@ function isiRekapBulanan(workbook, dataset, struktur, tahun) {
   });
 
   const kolomBulanAkhir = hurufKolom(Math.max(kolomTotalBulanan - 1, 2));
+  const kolomPetugasData = hurufData(struktur, 'petugas', 2);
+  const kolomTahunData = hurufData(struktur, 'tahun', 7);
   for (let baris = petugasAwal; baris <= petugasAkhir; baris += 1) {
     // Perbaiki formula total yang di template asli menunjuk baris pertama terus.
     sheet.getCell(baris, kolomTotalBulanan).value = {
@@ -989,7 +1154,7 @@ function isiRekapBulanan(workbook, dataset, struktur, tahun) {
     };
     if (kolomJumlahPenugasan) {
       sheet.getCell(baris, kolomJumlahPenugasan).value = {
-        formula: `IF($A${baris}="","",COUNTIFS('Data Penugasan'!$B$${dataAwal}:$B$${dataAkhir},$A${baris},'Data Penugasan'!$F$${dataAwal}:$F$${dataAkhir},$B$3))`,
+        formula: `IF($A${baris}="","",COUNTIFS('Data Penugasan'!$${kolomPetugasData}$${dataAwal}:$${kolomPetugasData}$${dataAkhir},$A${baris},'Data Penugasan'!$${kolomTahunData}$${dataAwal}:$${kolomTahunData}$${dataAkhir},$B$3))`,
       };
     }
   }
@@ -1060,6 +1225,10 @@ function isiRekapJenis(workbook, dataset, struktur) {
 
   const kolomJenisTerakhir = hurufKolom(Math.max(kolomTotal - 1, kolomJenisAwal));
   const gayaTotal = sheet.getCell(petugasAwal, kolomTotalJenis).numFmt;
+  const kolomPetugasData = hurufData(struktur, 'petugas', 2);
+  const kolomJenisData = hurufData(struktur, 'jenis', 3);
+  const kolomHonorData = hurufData(struktur, 'honor', 8);
+  const kolomTahunData = hurufData(struktur, 'tahun', 7);
 
   for (let baris = petugasAwal; baris <= petugasAkhir; baris += 1) {
     sheet.getCell(baris, 1).value = petugas[baris - petugasAwal]?.nama || null;
@@ -1068,7 +1237,7 @@ function isiRekapJenis(workbook, dataset, struktur) {
       const kolom = kolomJenisAwal + indeks;
       const cell = sheet.getCell(baris, kolom);
       cell.value = {
-        formula: `IF($A${baris}="","",SUMIFS('Data Penugasan'!$G$${dataAwal}:$G$${dataAkhir},'Data Penugasan'!$B$${dataAwal}:$B$${dataAkhir},$A${baris},'Data Penugasan'!$C$${dataAwal}:$C$${dataAkhir},${hurufKolom(kolom)}$5,'Data Penugasan'!$F$${dataAwal}:$F$${dataAkhir},$B$3))`,
+        formula: `IF($A${baris}="","",SUMIFS('Data Penugasan'!$${kolomHonorData}$${dataAwal}:$${kolomHonorData}$${dataAkhir},'Data Penugasan'!$${kolomPetugasData}$${dataAwal}:$${kolomPetugasData}$${dataAkhir},$A${baris},'Data Penugasan'!$${kolomJenisData}$${dataAwal}:$${kolomJenisData}$${dataAkhir},${hurufKolom(kolom)}$5,'Data Penugasan'!$${kolomTahunData}$${dataAwal}:$${kolomTahunData}$${dataAkhir},$B$3))`,
       };
       if (gayaTotal) cell.numFmt = gayaTotal;
     }

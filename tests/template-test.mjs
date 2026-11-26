@@ -32,6 +32,11 @@ const dataset = {
     { id: 3, nama: 'Pengolahan Data', urutan: 3 },
     { id: 5, nama: 'Koordinasi', urutan: 4 },
   ],
+  posisi: [
+    { id: 1, jenis_kegiatan_id: 1, nama: 'PPL', urutan: 1 },
+    { id: 2, jenis_kegiatan_id: 2, nama: 'PML', urutan: 1 },
+    { id: 3, jenis_kegiatan_id: 1, nama: 'PML', urutan: 2 },
+  ],
   petugas: [
     { id: 1, nama: 'Budi Santoso', urutan: 1 },
     { id: 2, nama: 'Siti Aminah', urutan: 2 },
@@ -39,11 +44,11 @@ const dataset = {
     { id: 9, nama: 'Tidak Punya Penugasan', urutan: 4 },
   ],
   penugasan: [
-    { id: 1, petugas_id: 1, jenis_kegiatan_id: 1, nama_pekerjaan: 'SURVEI A', bulan: 1, tahun: 2026, honor: 1500000 },
-    { id: 2, petugas_id: 2, jenis_kegiatan_id: 2, nama_pekerjaan: 'SENSUS B', bulan: 2, tahun: 2026, honor: 2000000 },
-    { id: 3, petugas_id: 1, jenis_kegiatan_id: 3, nama_pekerjaan: 'ENTRI C', bulan: 3, tahun: 2026, honor: 1250000 },
-    { id: 4, petugas_id: 3, jenis_kegiatan_id: 5, nama_pekerjaan: 'RAPAT D', bulan: 4, tahun: 2026, honor: 750000 },
-    { id: 5, petugas_id: 1, jenis_kegiatan_id: 1, nama_pekerjaan: 'SURVEI E', bulan: 1, tahun: 2025, honor: 500000 },
+    { id: 1, petugas_id: 1, jenis_kegiatan_id: 1, posisi_id: 3, nama_pekerjaan: 'SURVEI A', bulan: 1, tahun: 2026, honor: 1500000 },
+    { id: 2, petugas_id: 2, jenis_kegiatan_id: 2, posisi_id: 2, nama_pekerjaan: 'SENSUS B', bulan: 2, tahun: 2026, honor: 2000000 },
+    { id: 3, petugas_id: 1, jenis_kegiatan_id: 3, posisi_id: null, nama_pekerjaan: 'ENTRI C', bulan: 3, tahun: 2026, honor: 1250000 },
+    { id: 4, petugas_id: 3, jenis_kegiatan_id: 5, posisi_id: null, nama_pekerjaan: 'RAPAT D', bulan: 4, tahun: 2026, honor: 750000 },
+    { id: 5, petugas_id: 1, jenis_kegiatan_id: 1, posisi_id: 1, nama_pekerjaan: 'SURVEI E', bulan: 1, tahun: 2025, honor: 500000 },
   ],
 };
 
@@ -66,10 +71,13 @@ const data = workbook.getWorksheet(TEMPLATE_BAWAAN.namaSheetData);
 assert.equal(data.getCell('B5').value, 'Budi Santoso');
 assert.equal(data.getCell('C5').value, 'Survei');
 assert.equal(data.getCell('D5').value, 'SURVEI E');
-assert.equal(data.getCell('E5').value, 'Januari');
-assert.equal(data.getCell('F5').value, 2025, 'data diurutkan dari tahun terlama');
-assert.equal(data.getCell('G5').value, 500000);
-assert.equal(data.getCell('G9').value, 750000);
+assert.equal(data.getCell('E5').value, 'PPL', 'posisi petugas ikut diekspor');
+assert.equal(data.getCell('F5').value, 'Januari');
+assert.equal(data.getCell('G5').value, 2025, 'data diurutkan dari tahun terlama');
+assert.equal(data.getCell('H5').value, 500000);
+assert.equal(data.getCell('E6').value, 'PML', 'posisi per jenis kegiatan ikut diekspor');
+assert.equal(data.getCell('E8').value, '', 'baris tanpa posisi dibiarkan kosong');
+assert.equal(data.getCell('H9').value, 750000);
 assert.equal(data.getCell('B10').value, null, 'baris setelah data harus kosong');
 assert.ok(data.getCell('A5').formula || data.getCell('A5').sharedFormula, 'formula No. tetap ada');
 
@@ -105,8 +113,8 @@ assert.equal(jenis.getCell('H10').value, null, 'kolom di luar daftar dibersihkan
 assert.equal(jenis.getCell('M10').value, null, 'kolom setelah total dibersihkan');
 
 // Data validation pada Data Penugasan harus tetap ada.
-assert.ok(data.getCell('E5').dataValidation, 'validasi bulan tetap ada');
-assert.ok(data.getCell('F5').dataValidation, 'validasi tahun tetap ada');
+assert.ok(data.getCell('F5').dataValidation, 'validasi bulan tetap ada');
+assert.ok(data.getCell('G5').dataValidation, 'validasi tahun tetap ada');
 
 const buffer = await workbook.xlsx.writeBuffer();
 const hasil = path.join(os.tmpdir(), 'opencode', 'uji-template.xlsx');

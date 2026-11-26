@@ -489,6 +489,14 @@ function urutan_nama_kegiatan_berikutnya(): int
     return (int) db()->query('SELECT COALESCE(MAX(urutan), 0) + 1 FROM nama_kegiatan')->fetchColumn();
 }
 
+/** Urutan posisi berikutnya di dalam satu jenis kegiatan. */
+function urutan_posisi_berikutnya(int $jenisId): int
+{
+    $stmt = db()->prepare('SELECT COALESCE(MAX(urutan), 0) + 1 FROM posisi_petugas WHERE jenis_kegiatan_id = ?');
+    $stmt->execute([$jenisId]);
+    return (int) $stmt->fetchColumn();
+}
+
 function baris_petugas(int $id): array
 {
     $stmt = db()->prepare('SELECT id, nama, urutan, versi FROM petugas WHERE id = ?');

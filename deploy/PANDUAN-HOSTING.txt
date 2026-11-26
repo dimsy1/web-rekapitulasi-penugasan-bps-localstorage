@@ -1,0 +1,224 @@
+PANDUAN HOSTING INFINITYFREE
+Dashboard Honor & Penugasan Petugas (Merpati)
+
+Domain   : https://merpati3519.free.nf
+Folder   : merpati3519.free.nf/htdocs
+Database : if0_43511136_db_merpati3519
+Host SQL : sql104.infinityfree.com (port 3306)
+User SQL : if0_43511136
+
+
+ISI PAKET
+---------
+infinityfree-htdocs/
+  .htaccess
+  index.html, login.html, data.html, penugasan.html, petugas.html,
+  master-jenis.html, rekap-bulanan.html, rekap-jenis.html
+  css/style.css
+  js/... (termasuk js/store/)
+  vendor/exceljs.min.js
+  data/template-matriks.xlsx
+  PANDUAN-HOSTING.txt
+  api/
+    .htaccess
+    api.php
+    bootstrap.php
+    config.php           <-- EDIT dulu (satu baris password)
+    config.contoh.php
+    skema.sql            <-- impor ke phpMyAdmin
+    data-nama-kegiatan.sql
+    migrasi-posisi-petugas.sql
+    buat-admin.php       <-- HAPUS setelah akun admin dibuat
+
+Isi folder infinityfree-htdocs/ diupload LANGSUNG ke dalam htdocs.
+Jangan membuat folder tambahan di dalam htdocs (jangan sampai menjadi
+htdocs/infinityfree-htdocs).
+
+
+LANGKAH 1 - PERSIAPAN DI CLIENT AREA
+------------------------------------
+1. Menu "PHP Configuration" (atau Select PHP Version): pilih PHP 8.2.
+   Jangan PHP 7.4.
+2. Menu "MySQL Databases": database if0_43511136_db_merpati3519 sudah
+   dibuat, jadi tidak perlu membuat lagi.
+3. Catat password akun hosting. Password ini yang dipakai untuk db_pass.
+   (Bukan password login Client Area.)
+
+
+LANGKAH 2 - EDIT api/config.php (WAJIB)
+---------------------------------------
+Buka api/config.php di paket ini, lalu isi db_pass:
+
+    'db_host' => 'sql104.infinityfree.com',
+    'db_port' => 3306,
+    'db_name' => 'if0_43511136_db_merpati3519',
+    'db_user' => 'if0_43511136',
+    'db_pass' => 'PASSWORD-AKUN-HOSTING-ANDA',
+
+Nilai db_host, db_name, dan db_user sudah terisi. Yang perlu diganti
+hanya db_pass. Jangan ubah setup_token sebelum akun admin dibuat:
+token itu dipakai pada Langkah 6.
+
+
+LANGKAH 3 - IMPOR SKEMA DATABASE
+--------------------------------
+1. Client Area > MySQL Databases > tombol phpMyAdmin pada database
+   if0_43511136_db_merpati3519.
+2. Pilih database itu di panel kiri.
+3. Tab "Import" > Choose File > pilih api/skema.sql > Go.
+   Harus muncul pesan sukses dan tabel: admin, sesi, petugas,
+   jenis_kegiatan, posisi_petugas, posisi_limit, nama_kegiatan,
+   penugasan, meta, log, template_ekspor, login_gagal.
+4. Opsional tapi disarankan: ulangi Import dengan
+   api/data-nama-kegiatan.sql. Ini mengisi 73 nama kegiatan tahun 2026
+   agar kolom nama pekerjaan punya saran otomatis.
+   File ini aman diimpor berulang (tidak membuat duplikat).
+
+Bila database sebelumnya sudah pernah dipakai (bukan baru), jangan impor
+skema.sql. Cukup impor api/migrasi-posisi-petugas.sql. Sebaiknya ekspor
+dulu lewat tab Export sebagai cadangan.
+
+
+LANGKAH 4 - UPLOAD KE htdocs
+----------------------------
+Cara A - File Manager (paling mudah)
+1. Buka File Manager > folder htdocs.
+2. Hapus file bawaan bila ada: index2.html, default.php.
+3. Upload file infinityfree-htdocs.zip ke htdocs.
+4. Klik kanan file zip > Extract. Pastikan hasilnya:
+   htdocs/index.html, htdocs/css/, htdocs/js/, htdocs/api/
+   BUKAN htdocs/infinityfree-htdocs/index.html.
+5. Hapus file zip setelah extract.
+
+Cara B - FileZilla
+1. Menu FTP Details: Host ftpupload.net, Port 21, username & password FTP.
+2. Aktifkan Server > Force showing hidden files (agar .htaccess ikut).
+3. Tarik ISI folder infinityfree-htdocs/ ke htdocs.
+
+PENTING: index.html, css/, js/, api/ harus berada langsung di htdocs.
+Aplikasi memakai path absolut (/css, /js, /api/api.php).
+
+
+LANGKAH 5 - AKTIFKAN HTTPS (SSL)
+--------------------------------
+File .htaccess mengalihkan HTTP ke HTTPS. Bila SSL belum aktif, situs bisa
+gagal dibuka atau terjadi redirect loop.
+
+1. Control Panel > Free SSL Certificates > New SSL Certificate.
+2. Domain: merpati3519.free.nf (dan www.merpati3519.free.nf bila diminta).
+3. Ikuti verifikasi (biasanya CNAME), tunggu status issued/active.
+4. Buka https://merpati3519.free.nf
+
+Bila ingin mengetes lewat HTTP sebelum SSL aktif, komentari sementara blok
+<IfModule mod_rewrite.c> ... </IfModule> di bagian atas .htaccess,
+lalu aktifkan lagi setelah SSL terpasang.
+
+
+LANGKAH 6 - BUAT AKUN ADMIN PERTAMA
+-----------------------------------
+Database baru belum punya akun admin. Buka di browser:
+
+    https://merpati3519.free.nf/api/buat-admin.php?token=TOKEN_ANDA
+
+TOKEN_ANDA adalah nilai 'setup_token' di api/config.php pada server
+(48 karakter acak, jangan dibagikan). Isi username dan password
+(minimal 8 karakter), lalu simpan.
+
+Setelah berhasil:
+1. HAPUS file api/buat-admin.php dari server.
+2. Edit api/config.php di server, ubah setup_token menjadi ''.
+
+
+LANGKAH 7 - UJI
+---------------
+1. Tes API + database:
+   https://merpati3519.free.nf/api/api.php?aksi=sehat
+   Harus muncul JSON: {"ok":true,"php":"8.2.x","db":true,...}
+   Bila "db":false, db_pass di api/config.php masih salah.
+2. Buka https://merpati3519.free.nf - harus diarahkan ke halaman login.
+3. Login dengan akun yang baru dibuat.
+4. Buka Daftar Jenis Kegiatan: tambah jenis, posisi, dan limit honor
+   tahun 2026.
+5. Buka Data & Excel: impor file Excel matriks penugasan. Pratinjau harus
+   menampilkan jumlah petugas, jenis, posisi, dan total honor.
+6. Simpan satu penugasan, muat ulang halaman - data harus tetap ada.
+7. Uji Unduh Template dan Ekspor Excel.
+
+
+LANGKAH 8 - KEAMANAN SETELAH SELESAI
+------------------------------------
+- api/buat-admin.php sudah terhapus dari server.
+- setup_token di api/config.php sudah ''.
+- Ganti password admin bila memakai nilai yang mudah ditebak.
+- api/config.php berisi password database: jangan dibagikan, jangan
+  di-commit ke git, jangan diupload ke folder selain api/.
+- Hosting gratis tidak punya backup otomatis. Lakukan Export database
+  dari phpMyAdmin secara berkala (tab Export > Go).
+
+
+MENGOSONGKAN DATA (opsional)
+----------------------------
+Di lokal ada perintah "npm run reset", tetapi hosting tidak menyediakan
+terminal. Gunakan phpMyAdmin > database > tab SQL, lalu jalankan:
+
+    SET FOREIGN_KEY_CHECKS = 0;
+    TRUNCATE TABLE penugasan;
+    TRUNCATE TABLE posisi_limit;
+    TRUNCATE TABLE posisi_petugas;
+    TRUNCATE TABLE petugas;
+    TRUNCATE TABLE jenis_kegiatan;
+    TRUNCATE TABLE template_ekspor;
+    TRUNCATE TABLE log;
+    TRUNCATE TABLE sesi;
+    TRUNCATE TABLE login_gagal;
+    SET FOREIGN_KEY_CHECKS = 1;
+    UPDATE meta SET nilai = CAST(nilai AS UNSIGNED) + 1 WHERE kunci = 'revisi';
+
+Perintah di atas mengosongkan data operasional tetapi mempertahankan akun
+admin dan daftar nama kegiatan. Bila ingin menghapus akun admin juga,
+tambahkan:
+
+    TRUNCATE TABLE admin;
+
+lalu buat akun baru lewat api/buat-admin.php (upload ulang file itu dan
+isi setup_token sementara).
+
+
+BILA ADA MASALAH
+----------------
+HTTP 500 setelah upload
+  Hapus baris "Options -Indexes" di .htaccess dan api/.htaccess, lalu
+  muat ulang. Bila tetap 500, cek menu Error Log di Client Area.
+
+Halaman tanpa CSS / tampilan rusak
+  Isi folder salah letak. index.html dan css/ harus langsung di htdocs.
+
+"db":false pada tes sehat
+  db_host harus sqlXXX.infinityfree.com (bukan localhost), db_name harus
+  lengkap dengan awalan if0_43511136_, dan db_pass adalah password akun
+  hosting.
+
+Muncul halaman default InfinityFree
+  Hapus index2.html / default.php bawaan di htdocs.
+
+Login berhasil tetapi kembali ke login.html
+  Biasanya selisih zona waktu PHP dan MySQL pada hosting. Paket ini sudah
+  menanganinya. Bila masih terjadi, hapus sesi lama lewat phpMyAdmin:
+      DELETE FROM sesi; DELETE FROM login_gagal;
+  lalu login ulang. Pastikan api/bootstrap.php dan api/api.php yang
+  terupload adalah versi terbaru dari paket ini.
+
+"tabel posisi_petugas tidak ada" atau gagal simpan posisi
+  Database lama belum dimigrasi. Impor api/migrasi-posisi-petugas.sql.
+
+Penugasan tidak bisa disimpan: "limit honor belum diatur"
+  Buka Daftar Jenis Kegiatan dan isi limit honor posisi untuk tahun
+  penugasan tersebut. Limit diisi manual per tahun.
+
+Upload file ditolak / gagal
+  Hosting gratis membatasi ukuran upload. Upload file satu per satu atau
+  gunakan FileZilla. Batas template Excel di aplikasi 4 MB.
+
+Domain belum terbuka
+  Domain baru bisa butuh sampai 72 jam (DNS caching). Tunggu, lalu coba
+  dari jaringan lain atau mode incognito.

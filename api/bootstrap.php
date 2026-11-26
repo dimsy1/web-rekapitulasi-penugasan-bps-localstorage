@@ -54,8 +54,9 @@ function db(): PDO
     }
 
     $dsn = sprintf(
-        'mysql:host=%s;dbname=%s;charset=utf8mb4',
+        'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
         (string) konfig('db_host'),
+        (int) konfig('db_port', 3306),
         (string) konfig('db_name')
     );
 

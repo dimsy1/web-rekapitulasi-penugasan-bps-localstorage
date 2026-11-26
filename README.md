@@ -345,6 +345,34 @@ diisi nama petugas di kolom A sheet rekap lalu diimpor kembali.
   `npm run sandi` sebelum dashboard dipakai bersama.
 - Backup database dapat dilakukan dari HeidiSQL/phpMyAdmin Laragon.
 
+## Hosting di InfinityFree
+
+Paket siap upload dibangun dengan:
+
+```bash
+npm run hosting
+```
+
+Hasilnya:
+
+- `dist/infinityfree-htdocs/` — isi folder ini yang diupload **langsung** ke
+  `htdocs` (jangan sampai menjadi `htdocs/infinityfree-htdocs`).
+- `dist/infinityfree-htdocs.zip` — alternatif upload lalu *Extract* di File Manager.
+
+Isi paket = seluruh `public/` + `api/` + `PANDUAN-HOSTING.txt`. Berkas
+`api/config.php` dan `api/data-nama-kegiatan.sql` yang sudah ada di
+`dist/infinityfree-htdocs/` **dipertahankan** saat paket dibangun ulang, jadi
+kata sandi database tidak hilang. Bila belum ada, `api/config.php` dibuat dari
+`deploy/config.infinityfree.php` dan skrip memperingatkan nilai yang masih
+placeholder.
+
+Langkah hosting lengkap ada di `dist/infinityfree-htdocs/PANDUAN-HOSTING.txt`:
+impor `api/skema.sql` lewat phpMyAdmin, upload ke `htdocs`, aktifkan SSL, buat
+akun admin lewat `api/buat-admin.php?token=...`, lalu hapus berkas itu.
+
+`dist/` tidak di-commit (lihat `.gitignore`) karena berisi `api/config.php` dan
+paket build. Yang di-commit hanya sumbernya di `deploy/` dan `tools/`.
+
 ## Struktur proyek
 
 ```
@@ -382,7 +410,11 @@ public/
 tools/
   setup-local.php    # menyiapkan db_selaras sebelum npm run dev
   reset-data.php     # mengosongkan data aplikasi (npm run reset)
+  siap-hosting.mjs   # membangun dist/ untuk InfinityFree (npm run hosting)
   buat-template.mjs  # membangun ulang template bawaan dari template BPS
+deploy/
+  config.infinityfree.php  # contoh api/config.php untuk hosting
+  PANDUAN-HOSTING.txt      # panduan upload, impor skema, buat admin
 tests/
   smoke-test.mjs, template-test.mjs
 ```

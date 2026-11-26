@@ -233,6 +233,36 @@ function gabungkanRingkas(daftar) {
   return { versi: 3, petugas, jenis, penugasan };
 }
 
+async function konfirmasiImpor(hasil) {
+  const belumLengkap = Number(hasil.ringkasan.jumlahBelumLengkap) || 0;
+  if (belumLengkap === 0) return true;
+
+  if (window.Swal) {
+    const jawab = await window.Swal.fire({
+      title: 'Masih ada data belum lengkap',
+      html: `<p style="margin:0 0 8px">Sebanyak <strong>${formatAngka(
+        belumLengkap
+      )} baris</strong> di file Excel belum lengkap.</p>
+        <p style="margin:0">Sebaiknya lengkapi dulu file Excel-nya agar tidak perlu mengedit
+        satu per satu setelah impor. Tetap lanjutkan impor?</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Tetap impor',
+      cancelButtonText: 'Periksa lagi',
+      confirmButtonColor: '#1267b8',
+      cancelButtonColor: '#64748b',
+      reverseButtons: true,
+      focusCancel: true,
+    });
+    return jawab.isConfirmed;
+  }
+
+  return window.confirm(
+    `Masih ada ${belumLengkap} baris belum lengkap di file Excel. ` +
+      'Sebaiknya lengkapi dulu. Tetap lanjutkan impor?'
+  );
+}
+
 async function terapkanImpor() {
   const hasil = state.hasil;
   if (!hasil?.sumber.length || state.sibuk) return;
@@ -242,6 +272,8 @@ async function terapkanImpor() {
     toast('Tidak ada baris valid untuk diimpor.', 'info');
     return;
   }
+
+  if (!(await konfirmasiImpor(hasil))) return;
 
   setSibuk(true, true);
   try {
